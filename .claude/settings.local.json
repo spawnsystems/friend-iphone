@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm next:*)",
+      "Bash(npm run:*)",
+      "Bash(ls node_modules/.bin/next*)",
+      "Bash(npx --no-install next build)",
+      "Bash(npm install:*)",
+      "Bash(npx --no-install tsc --noEmit)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node -e ':*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
+    ]
+  }
+}
