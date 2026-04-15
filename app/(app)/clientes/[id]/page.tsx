@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft, Phone, Mail, MapPin, FileText, Building2, Store, User, TrendingDown } from 'lucide-react'
 import { fetchClienteById } from '@/app/actions/clientes'
 import { RepairCard } from '@/components/repair-card'
+import { ClientEditButton } from './ClientEditButton'
 import { cn } from '@/lib/utils'
 
 const TIPO_CONFIG = {
@@ -65,6 +66,7 @@ export default async function ClienteDetailPage({ params }: ClienteDetailPagePro
             <p className="text-[13px] text-muted-foreground">{subName}</p>
           )}
         </div>
+        <ClientEditButton cliente={cliente} />
       </div>
 
       {/* Info card */}

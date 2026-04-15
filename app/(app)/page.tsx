@@ -2,8 +2,8 @@
 
 import * as React from "react"
 import { Dashboard } from "@/components/dashboard"
-import { fetchReparaciones, fetchAlertas, fetchClientes } from "@/app/actions/data"
-import type { ReparacionResumen, Alerta, Cliente } from "@/lib/types/database"
+import { fetchReparaciones, fetchAlertas, fetchClientes, fetchMiRol } from "@/app/actions/data"
+import type { ReparacionResumen, Alerta, Cliente, AppRole } from "@/lib/types/database"
 
 // ============================================================
 // Mock data — used when Supabase isn't configured yet
@@ -91,6 +91,7 @@ export default function HomePage() {
   const [clientes, setClientes] = React.useState<Cliente[]>(
     isSupabaseConfigured ? [] : MOCK_CLIENTES
   )
+  const [role, setRole] = React.useState<AppRole | null>(null)
   const [isLoading, setIsLoading] = React.useState(isSupabaseConfigured)
 
   // ─── Load real data from Supabase ──────────────────────────
@@ -99,14 +100,16 @@ export default function HomePage() {
 
     setIsLoading(true)
     try {
-      const [reps, als, cls] = await Promise.all([
+      const [reps, als, cls, rol] = await Promise.all([
         fetchReparaciones(),
         fetchAlertas(),
         fetchClientes(),
+        fetchMiRol(),
       ])
       setReparaciones(reps)
       setAlertas(als)
       setClientes(cls)
+      setRole(rol)
     } catch (err) {
       console.error("[HomePage] Error loading data:", err)
       // Fall back to mocks if Supabase fails
@@ -127,6 +130,7 @@ export default function HomePage() {
       reparaciones={reparaciones}
       alertas={alertas}
       clientes={clientes}
+      role={role}
       onRefresh={loadData}
       isLoading={isLoading}
     />

@@ -176,6 +176,28 @@ El dashboard principal muestra todas las reparaciones activas con filtros multi-
 
 Los filtros se combinan: primero filtra por estado, luego por tipo, y finalmente ordena por fecha de ingreso.
 
+### Edición de reparaciones
+
+Clickear en cualquier tarjeta abre un sheet con todos los datos de la reparación:
+
+**Campos editables por todos (empleado + dueño/admin):**
+- Problema — descripción del equipo
+- Diagnóstico — hallazgos técnicos (opcional)
+- Notas internas — observaciones del taller (opcional)
+
+**Campos editables solo por dueño/admin:**
+- Precio cliente ARS y USD
+
+**Transiciones de estado** — botones según estado actual:
+- **Recibido** → "Iniciar reparación" (pasa a en_reparacion)
+- **En reparación** → "Marcar como listo" (pasa a listo)
+- **Listo** → "Entregar al cliente" o "Volver a en reparación"
+- **Cancelar** — visible para dueño/admin en cualquier momento
+
+Las transiciones se validan en el servidor. Al cambiar de estado, se actualizan los timestamps automáticamente (`fecha_inicio_reparacion`, `fecha_listo`, `fecha_entrega`).
+
+Reparaciones entregadas o canceladas se muestran en modo lectura (no se pueden editar).
+
 ### Nuevo registro de reparación
 
 Cuando se abre el sheet de "Nuevo Ingreso":
@@ -224,6 +246,12 @@ Hay dos flujos según el tipo:
 - Saldo en rojo si es negativo (deuda)
 - Split de franquicia si aplica
 - Historial completo de reparaciones
+
+**Editar cliente** — botón con ícono de lápiz junto al nombre:
+- Abre un sheet con todos los datos del cliente pre-cargados
+- Campos editables: nombre, nombre de negocio, teléfono, email, dirección, split (si es franquicia), notas
+- El tipo de cliente es inmutable (no se puede cambiar de retail a gremio, etc.)
+- Guardar actualiza inmediatamente el detalle y la lista
 
 ---
 

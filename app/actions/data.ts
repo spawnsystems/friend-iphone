@@ -1,7 +1,15 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import type { ReparacionResumen, Alerta, Cliente } from '@/lib/types/database'
+import { getCurrentUserRole } from '@/lib/auth/get-current-user'
+import type { ReparacionResumen, Alerta, Cliente, AppRole } from '@/lib/types/database'
+
+// ============================================================
+// Fetch current user role (thin wrapper for client components)
+// ============================================================
+export async function fetchMiRol(): Promise<AppRole | null> {
+  return getCurrentUserRole()
+}
 
 // ============================================================
 // Fetch reparaciones activas (not entregado/cancelado)

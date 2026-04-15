@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button"
 import { AlertCard } from "@/components/alert-card"
 import { RepairCard } from "@/components/repair-card"
 import { NewRepairSheet } from "@/components/new-repair-sheet"
+import { RepairDetailSheet } from "@/components/repair-detail-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { ReparacionResumen, Alerta, Cliente } from "@/lib/types/database"
+import type { ReparacionResumen, Alerta, Cliente, AppRole } from "@/lib/types/database"
 
 interface DashboardProps {
   reparaciones: ReparacionResumen[]
   alertas: Alerta[]
   clientes: Cliente[]
+  role: AppRole | null
   onRefresh: () => Promise<void>
   isLoading?: boolean
 }
@@ -21,10 +23,12 @@ export function Dashboard({
   reparaciones,
   alertas,
   clientes,
+  role,
   onRefresh,
   isLoading = false,
 }: DashboardProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [selectedRepairId, setSelectedRepairId] = React.useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState<'todos' | 'recibido' | 'en_reparacion' | 'listo'>('todos')
   const [activeSort, setActiveSort] = React.useState<'reciente' | 'antiguo'>('reciente')
@@ -256,7 +260,11 @@ export function Dashboard({
           ) : (
             <div className="space-y-2.5">
               {filteredReparaciones.map((reparacion) => (
-                <RepairCard key={reparacion.id} reparacion={reparacion} />
+                <RepairCard
+                  key={reparacion.id}
+                  reparacion={reparacion}
+                  onClick={() => setSelectedRepairId(reparacion.id)}
+                />
               ))}
             </div>
           )}
@@ -281,6 +289,14 @@ export function Dashboard({
         onOpenChange={setSheetOpen}
         clientes={clientes}
         onSuccess={handleRefresh}
+      />
+
+      {/* ── Repair Detail / Edit Sheet ─────────────────────── */}
+      <RepairDetailSheet
+        reparacionId={selectedRepairId}
+        role={role}
+        onClose={() => setSelectedRepairId(null)}
+        onUpdated={handleRefresh}
       />
     </div>
   )
