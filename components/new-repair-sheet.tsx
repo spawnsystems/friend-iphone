@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { Barcode, Loader2, X, Store, AlertCircle } from "lucide-react"
+import { Barcode, Loader2, X, Store, AlertCircle, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,9 +12,17 @@ import {
   Sheet,
   SheetContent,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { ModelCombobox } from "@/components/model-combobox"
 import { ClientSearch } from "@/components/client-search"
 import { crearReparacion } from "@/app/actions/reparaciones"
+import { createClienteRapido } from "@/app/actions/clientes"
 import type { Cliente, TipoCliente } from "@/lib/types/database"
 
 interface NewRepairSheetProps {
@@ -41,12 +49,57 @@ export function NewRepairSheet({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [formData, setFormData] = React.useState(INITIAL_FORM)
 
+  // Track newly created clients so they appear in the dropdown
+  // without needing a full page refresh
+  const [extraClientes, setExtraClientes] = React.useState<Cliente[]>([])
+  const allClientes = React.useMemo(
+    () => [...clientes, ...extraClientes],
+    [clientes, extraClientes],
+  )
+
+  // Quick create state (retail only)
+  const [quickCreateOpen, setQuickCreateOpen] = React.useState(false)
+  const [quickNombre, setQuickNombre] = React.useState("")
+  const [quickTelefono, setQuickTelefono] = React.useState("")
+  const [isCreating, setIsCreating] = React.useState(false)
+
   // Refs for field-to-field navigation (scanner Enter flow)
   const imeiInputRef = React.useRef<HTMLInputElement>(null)
   const modelTriggerRef = React.useRef<HTMLButtonElement>(null)
 
+  // Reset local state when sheet closes
+  React.useEffect(() => {
+    if (!open) {
+      setExtraClientes([])
+      setQuickNombre("")
+      setQuickTelefono("")
+    }
+  }, [open])
+
+  // Quick create retail client
+  async function handleQuickCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!quickNombre.trim()) return
+    setIsCreating(true)
+    const result = await createClienteRapido(quickNombre.trim(), quickTelefono.trim() || undefined)
+    setIsCreating(false)
+
+    if (!result.success || !result.cliente) {
+      toast.error("No se pudo crear el cliente", { description: result.error })
+      return
+    }
+
+    const newCliente = result.cliente
+    setExtraClientes((prev) => [...prev, newCliente])
+    setFormData((prev) => ({ ...prev, cliente_id: newCliente.id, tipo_servicio: "retail" }))
+    setQuickCreateOpen(false)
+    setQuickNombre("")
+    setQuickTelefono("")
+    toast.success(`Cliente creado`, { description: `${newCliente.nombre} fue agregado.` })
+  }
+
   // Franchise split info from selected client
-  const selectedClient = clientes.find((c) => c.id === formData.cliente_id)
+  const selectedClient = allClientes.find((c) => c.id === formData.cliente_id)
   const isFranquicia = formData.tipo_servicio === "franquicia"
   const franchiseSplit = selectedClient?.franquicia_split
 
@@ -82,8 +135,8 @@ export function NewRepairSheet({
     setFormData((prev) => ({
       ...prev,
       cliente_id: clienteId || "",
-      // Auto-switch tipo when selecting a gremio/franquicia client
-      tipo_servicio: cliente.tipo !== "retail" ? cliente.tipo : prev.tipo_servicio,
+      // Always sync tipo_servicio from the selected client
+      tipo_servicio: cliente.tipo,
     }))
   }
 
@@ -128,10 +181,68 @@ export function NewRepairSheet({
   }
 
   return (
+    <>
+    <Dialog open={quickCreateOpen} onOpenChange={(o) => { if (!isCreating) setQuickCreateOpen(o) }}>
+      <DialogContent className="max-w-sm" >
+        <DialogHeader>
+          <DialogTitle>Crear cliente retail</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleQuickCreate} className="space-y-3 pt-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="qc-nombre" className="text-[13px] font-medium">
+              Nombre <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="qc-nombre"
+              placeholder="Ej: Carlos Mendoza"
+              value={quickNombre}
+              onChange={(e) => setQuickNombre(e.target.value)}
+              className="h-10 rounded-lg"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="qc-tel" className="text-[13px] font-medium">
+              Teléfono{" "}
+              <span className="text-muted-foreground font-normal">(opcional)</span>
+            </Label>
+            <Input
+              id="qc-tel"
+              type="tel"
+              placeholder="Ej: 1155554321"
+              value={quickTelefono}
+              onChange={(e) => setQuickTelefono(e.target.value)}
+              className="h-10 rounded-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuickCreateOpen(false)}
+              disabled={isCreating}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isCreating || !quickNombre.trim()}>
+              {isCreating ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                "Crear cliente"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[95vh] rounded-t-[20px] p-0 [&>button]:hidden"
+        className="h-[95vh] rounded-t-[20px] p-0 [&>button]:hidden mx-auto max-w-lg"
       >
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           {/* ── Everything scrolls together (header + fields) ── */}
@@ -220,10 +331,17 @@ export function NewRepairSheet({
                   value={formData.tipo_servicio}
                   onValueChange={(value) => {
                     if (value) {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tipo_servicio: value as TipoCliente,
-                      }))
+                      const newTipo = value as TipoCliente
+                      setFormData((prev) => {
+                        // Clear selected client if it doesn't match the new tipo
+                        const currentClient = allClientes.find((c) => c.id === prev.cliente_id)
+                        const clientStillValid = currentClient?.tipo === newTipo
+                        return {
+                          ...prev,
+                          tipo_servicio: newTipo,
+                          cliente_id: clientStillValid ? prev.cliente_id : "",
+                        }
+                      })
                     }
                   }}
                   className="grid grid-cols-3 gap-2"
@@ -246,11 +364,31 @@ export function NewRepairSheet({
                   Cliente <span className="text-destructive">*</span>
                 </Label>
                 <ClientSearch
-                  clientes={clientes.filter((c) => c.activo)}
+                  clientes={allClientes.filter((c) => c.activo && c.tipo === formData.tipo_servicio)}
                   value={formData.cliente_id}
                   onSelect={handleClientSelect}
                   placeholder="Buscar cliente..."
                 />
+
+                {/* Quick create — solo para retail */}
+                {formData.tipo_servicio === "retail" && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickCreateOpen(true)}
+                    className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-primary transition-colors mt-1 pl-0.5"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    ¿Cliente nuevo? Crear rápido
+                  </button>
+                )}
+
+                {/* Hint para gremio/franquicia sin clientes */}
+                {formData.tipo_servicio !== "retail" &&
+                  allClientes.filter((c) => c.activo && c.tipo === formData.tipo_servicio).length === 0 && (
+                  <p className="text-[12px] text-muted-foreground/70 pl-0.5 mt-1">
+                    Sin clientes {formData.tipo_servicio}. Pedile al encargado que los agregue en Clientes.
+                  </p>
+                )}
               </div>
 
               {/* Problema */}
@@ -321,5 +459,6 @@ export function NewRepairSheet({
         </form>
       </SheetContent>
     </Sheet>
+    </>
   )
 }

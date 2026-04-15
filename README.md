@@ -25,12 +25,21 @@ Webapp mobile-first para gestión interna de un taller técnico de reparación d
 ```
 friend-iphone/
 ├── app/
-│   ├── page.tsx                  # Dashboard principal
-│   ├── layout.tsx                # Root layout
+│   ├── (app)/                    # Route group — rutas autenticadas con nav compartida
+│   │   ├── layout.tsx            # AppHeader + BottomNav (mobile) / AppSidebar (desktop)
+│   │   ├── page.tsx              # Taller / Dashboard principal
+│   │   ├── clientes/
+│   │   │   ├── page.tsx          # Lista de clientes (search + filtro por tipo)
+│   │   │   ├── ClientesList.tsx  # Componente cliente interactivo (estado local)
+│   │   │   └── [id]/page.tsx     # Detalle: info, cuenta corriente, historial de reparaciones
+│   │   ├── stock/page.tsx        # Stock (placeholder hasta Fase 3)
+│   │   ├── finanzas/page.tsx     # Finanzas — dueño/admin only (placeholder hasta Fase 4)
+│   │   └── mas/page.tsx          # Más (placeholder hasta Fase 5)
+│   ├── layout.tsx                # Root layout (fonts, Toaster, Analytics)
 │   ├── login/                    # Login con email + contraseña
 │   ├── update-password/          # Activación de cuenta (flujo de invite)
 │   ├── perfil/                   # Perfil de usuario (nombre + cambio de contraseña)
-│   ├── admin/                    # Panel admin (usuarios, invitaciones)
+│   ├── admin/                    # Panel admin (usuarios, invitaciones) — sin bottom nav
 │   ├── auth/
 │   │   └── confirm/              # Route handler para token_hash de Supabase
 │   └── actions/
@@ -38,12 +47,20 @@ friend-iphone/
 │       ├── admin.ts              # deactivateUser, reactivateUser, changeUserRole
 │       ├── profile.ts            # updateNombre
 │       ├── data.ts               # fetchReparaciones, fetchAlertas, fetchClientes
-│       └── reparaciones.ts       # CRUD de reparaciones
+│       ├── reparaciones.ts       # crearReparacion
+│       └── clientes.ts           # fetchClientesCompleto, fetchClienteById, createClienteRapido, createClienteCompleto, updateCliente
 ├── components/
 │   ├── ui/                       # shadcn/ui (Button, Input, Dialog, Badge, etc.)
-│   ├── dashboard.tsx             # Layout principal del dashboard
+│   ├── app-header.tsx            # Header sticky mobile-only (Logo + UserMenu)
+│   ├── app-sidebar.tsx           # Sidebar desktop-only (Logo + nav items + UserMenu)
+│   ├── bottom-nav.tsx            # Bottom navigation mobile-only (4 o 5 slots según rol)
+│   ├── construction-placeholder.tsx  # Placeholder "Sección en construcción"
+│   ├── dashboard.tsx             # Contenido del Taller (filtros por estado, orden y tipo)
 │   ├── repair-card.tsx           # Tarjeta de reparación
-│   ├── new-repair-sheet.tsx      # Sheet para nueva reparación
+│   ├── new-repair-sheet.tsx      # Sheet nueva reparación + quick create cliente retail
+│   ├── client-card.tsx           # Tarjeta de cliente para lista
+│   ├── client-search.tsx         # Combobox de búsqueda de clientes
+│   ├── new-client-sheet.tsx      # Sheet creación completa de cliente (todos los tipos)
 │   ├── alert-card.tsx            # Alertas de stock / pasamanos
 │   ├── user-menu.tsx             # Dropdown de usuario (perfil, admin, logout)
 │   └── logo.tsx                  # Logo con link al home
@@ -52,6 +69,9 @@ friend-iphone/
 │   │   ├── client.ts             # createBrowserClient
 │   │   ├── server.ts             # createServerClient (Server Components / Actions)
 │   │   └── admin.ts              # Service role client (bypasa RLS)
+│   ├── auth/
+│   │   └── get-current-user.ts   # getCurrentUser() + getCurrentUserRole() con React.cache
+│   ├── feature-flags.ts          # FEATURES map + isFeatureEnabled(feature, rol)
 │   ├── schemas/
 │   │   └── auth.ts               # Zod schemas: loginSchema, updatePasswordSchema
 │   └── types/
@@ -129,6 +149,81 @@ En **Authentication → Email Templates → Invite user**, el link debe usar:
 ```
 {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/update-password
 ```
+
+---
+
+## Dashboard — Equipos en taller
+
+El dashboard principal muestra todas las reparaciones activas con filtros multi-dimensionales:
+
+### Filtros disponibles
+
+1. **Por estado** — pills (tabs)
+   - **Todos** — todos los equipos en taller
+   - **Recibido** — equipos sin iniciar reparación
+   - **En reparación** — en trabajo
+   - **Listo** — listos para entregar
+
+2. **Por tipo de servicio** — pills scrollables
+   - **Todos** — cualquier tipo
+   - **Retail** — clientes minoristas
+   - **Gremio** — clientes gremiales (descuentos)
+   - **Franquicia** — clientes franquiciados (split configurado)
+
+3. **Por orden** — botones toggle
+   - **Reciente** — más nuevo primero
+   - **Antiguo** — más viejo primero
+
+Los filtros se combinan: primero filtra por estado, luego por tipo, y finalmente ordena por fecha de ingreso.
+
+### Nuevo registro de reparación
+
+Cuando se abre el sheet de "Nuevo Ingreso":
+- **Responsive:** 
+  - Mobile: ocupa casi todo el ancho (95vh de alto desde abajo)
+  - Desktop: ancho máximo de 512px, centrado horizontalmente
+  
+- **Sync bidireccional tipo ↔ cliente:**
+  - Cambiar el tipo de servicio → dropdown de cliente solo muestra clientes compatibles
+  - Si el cliente actual no coincide con el nuevo tipo → se limpia el campo
+  - Seleccionar un cliente → tipo_servicio se auto-sincroniza automáticamente
+
+---
+
+## Clientes (`/clientes`)
+
+Lista y gestión de todos los clientes del taller, organizados en tres tipos:
+
+| Tipo | Color | Descripción |
+|---|---|---|
+| `retail` | Slate | Cliente individual, sin cuenta corriente |
+| `gremio` | Amber | Empresa con cuenta corriente (saldo ARS/USD) |
+| `franquicia` | Primary | Local franquiciado con split de ganancia configurado |
+
+### Lista de clientes
+- Búsqueda en tiempo real por nombre, nombre de negocio o teléfono
+- Filtro por tipo (pills con contador)
+- Acceso al detalle de cada cliente (info, cuenta corriente, historial)
+
+### Creación de clientes
+Hay dos flujos según el tipo:
+
+**Retail — creación rápida desde el formulario de reparación:**
+- En el sheet "Nuevo Ingreso", si el tipo es Retail, aparece el botón "¿Cliente nuevo? Crear rápido"
+- Abre un Dialog con solo Nombre + Teléfono (opcional)
+- El cliente queda seleccionado automáticamente sin cerrar el sheet de reparación
+
+**Gremio / Franquicia — creación completa desde `/clientes`:**
+- Se requieren más datos (nombre del negocio, split para franquicia)
+- Se crea automáticamente la `cuenta_corriente` con saldo inicial en cero
+- Desde el formulario de reparación aparece una ayuda: "Pedile al encargado que los agregue en Clientes"
+
+### Detalle de cliente (`/clientes/[id]`)
+- Datos de contacto con link directo a WhatsApp
+- Cuenta corriente con saldo ARS y USD (visible solo para gremio/franquicia)
+- Saldo en rojo si es negativo (deuda)
+- Split de franquicia si aplica
+- Historial completo de reparaciones
 
 ---
 

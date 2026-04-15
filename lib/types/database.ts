@@ -107,6 +107,21 @@ export interface Telefono {
   updated_at: string
 }
 
+export interface CuentaCorriente {
+  id: string
+  cliente_id: string
+  saldo_ars: number
+  saldo_usd: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ClienteConCuenta extends Cliente {
+  cuenta_corriente: CuentaCorriente | null
+  ultima_reparacion: string | null
+  total_reparaciones: number
+}
+
 export interface Alerta {
   tipo_alerta: 'stock_bajo' | 'pasamanos_sin_costo' | 'sin_presupuesto'
   mensaje: string

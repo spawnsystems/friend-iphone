@@ -1,10 +1,8 @@
 'use client'
 
 import * as React from "react"
-import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench } from "lucide-react"
+import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Logo } from "@/components/logo"
-import { UserMenu } from "@/components/user-menu"
 import { AlertCard } from "@/components/alert-card"
 import { RepairCard } from "@/components/repair-card"
 import { NewRepairSheet } from "@/components/new-repair-sheet"
@@ -28,6 +26,9 @@ export function Dashboard({
 }: DashboardProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [isRefreshing, setIsRefreshing] = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState<'todos' | 'recibido' | 'en_reparacion' | 'listo'>('todos')
+  const [activeSort, setActiveSort] = React.useState<'reciente' | 'antiguo'>('reciente')
+  const [activeTipoServicio, setActiveTipoServicio] = React.useState<'todos' | 'retail' | 'gremio' | 'franquicia'>('todos')
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -41,28 +42,47 @@ export function Dashboard({
 
   const readyCount = reparaciones.filter((r) => r.estado === "listo").length
 
-  return (
-    <div className="min-h-screen bg-background pb-28">
-      {/* ── Sticky Header ─────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/30">
-        <div className="flex items-center justify-between px-5 h-14">
-          <Logo />
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCw className={`h-[18px] w-[18px] ${isRefreshing ? "animate-spin" : ""}`} />
-            </Button>
-            <UserMenu />
-          </div>
-        </div>
-      </header>
+  // Tab counts
+  const tabCounts = {
+    todos:         reparaciones.length,
+    recibido:      reparaciones.filter((r) => r.estado === "recibido").length,
+    en_reparacion: reparaciones.filter((r) => r.estado === "en_reparacion").length,
+    listo:         reparaciones.filter((r) => r.estado === "listo").length,
+  }
 
-      <main className="px-5 pt-5 max-w-lg mx-auto">
+  // Apply all filters: estado, tipo_servicio, then sort
+  let filtered = activeTab === 'todos'
+    ? reparaciones
+    : reparaciones.filter((r) => r.estado === activeTab)
+
+  if (activeTipoServicio !== 'todos') {
+    filtered = filtered.filter((r) => r.tipo_servicio === activeTipoServicio)
+  }
+
+  const filteredReparaciones = [...filtered].sort((a, b) => {
+    const dateA = new Date(a.fecha_ingreso).getTime()
+    const dateB = new Date(b.fecha_ingreso).getTime()
+    return activeSort === 'reciente' ? dateB - dateA : dateA - dateB
+  })
+
+  return (
+    <div className="min-h-full bg-background">
+      <div className="px-5 pt-5 pb-6 max-w-lg lg:max-w-2xl mx-auto">
+        {/* ── Page title + refresh (visible en mobile y desktop) ── */}
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">Taller</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-[18px] w-[18px] ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+
         {/* ── Stats Cards ──────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 mb-7">
           {/* En Proceso */}
@@ -116,7 +136,7 @@ export function Dashboard({
           </section>
         )}
 
-        {/* ── Ingresos Recientes ───────────────────────────── */}
+        {/* ── Equipos en taller ────────────────────────────── */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-foreground text-[15px]">Equipos en taller</h2>
@@ -124,6 +144,90 @@ export function Dashboard({
               {reparaciones.length}
             </span>
           </div>
+
+          {/* Status tabs */}
+          {!isLoading && reparaciones.length > 0 && (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1 mb-4 scrollbar-none">
+                {([
+                  { key: 'todos',         label: 'Todos' },
+                  { key: 'recibido',      label: 'Recibido' },
+                  { key: 'en_reparacion', label: 'En reparación' },
+                  { key: 'listo',         label: 'Listo' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-medium transition-colors border ${
+                      activeTab === key
+                        ? 'bg-foreground text-background border-foreground'
+                        : 'bg-transparent text-muted-foreground border-border/60 hover:border-border hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                    {tabCounts[key] > 0 && (
+                      <span className={`tabular-nums text-[11px] ${
+                        activeTab === key ? 'text-background/70' : 'text-muted-foreground/70'
+                      }`}>
+                        {tabCounts[key]}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Additional filters: Sort + Tipo de Servicio */}
+              <div className="space-y-2 mb-4">
+                {/* Sort filter */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveSort('reciente')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[12px] font-medium transition-colors border ${
+                      activeSort === 'reciente'
+                        ? 'bg-primary/10 text-primary border-primary/30'
+                        : 'bg-transparent text-muted-foreground border-border/60 hover:border-border'
+                    }`}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    Reciente
+                  </button>
+                  <button
+                    onClick={() => setActiveSort('antiguo')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[12px] font-medium transition-colors border ${
+                      activeSort === 'antiguo'
+                        ? 'bg-primary/10 text-primary border-primary/30'
+                        : 'bg-transparent text-muted-foreground border-border/60 hover:border-border'
+                    }`}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    Antiguo
+                  </button>
+                </div>
+
+                {/* Tipo de Servicio filter pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {([
+                    { key: 'todos',      label: 'Todos' },
+                    { key: 'retail',     label: 'Retail' },
+                    { key: 'gremio',     label: 'Gremio' },
+                    { key: 'franquicia', label: 'Franquicia' },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setActiveTipoServicio(key)}
+                      className={`flex-shrink-0 px-3 h-8 rounded-full text-[12px] font-medium transition-colors border ${
+                        activeTipoServicio === key
+                          ? 'bg-primary/10 text-primary border-primary/30'
+                          : 'bg-transparent text-muted-foreground border-border/60 hover:border-border'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {isLoading ? (
             <div className="space-y-3">
@@ -141,18 +245,26 @@ export function Dashboard({
                 Registrá el primer equipo tocando el boton +
               </p>
             </div>
+          ) : filteredReparaciones.length === 0 ? (
+            <div className="text-center py-10 px-6">
+              <p className="text-[13px] text-muted-foreground">
+                {activeTipoServicio !== 'todos'
+                  ? `No hay equipos ${activeTipoServicio} en este estado.`
+                  : 'No hay equipos en este estado.'}
+              </p>
+            </div>
           ) : (
             <div className="space-y-2.5">
-              {reparaciones.map((reparacion) => (
+              {filteredReparaciones.map((reparacion) => (
                 <RepairCard key={reparacion.id} reparacion={reparacion} />
               ))}
             </div>
           )}
         </section>
-      </main>
+      </div>
 
-      {/* ── FAB ────────────────────────────────────────────── */}
-      <div className="fixed bottom-6 right-5 z-50">
+      {/* ── FAB ─ mobile: sobre la bottom nav; desktop: esquina ─ */}
+      <div className="fixed bottom-20 right-5 lg:bottom-6 z-50">
         <Button
           size="lg"
           className="h-14 w-14 rounded-full shadow-xl shadow-primary/25 active:scale-95 transition-transform"
