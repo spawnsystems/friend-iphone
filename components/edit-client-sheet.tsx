@@ -89,8 +89,9 @@ export function EditClientSheet({ cliente, open, onOpenChange, onSuccess }: Edit
       telefono: telefono.trim() || null,
       email: email.trim() || null,
       direccion: direccion.trim() || null,
+      // franquicia_split: only for franquicia type
       franquicia_split:
-        cliente.tipo === 'franquicia' ? parseFloat(franqSplit) / 100 : cliente.franquicia_split,
+        cliente.tipo === 'franquicia' ? parseFloat(franqSplit) / 100 : null,
       notas: notas.trim() || null,
     })
     setIsSubmitting(false)
@@ -112,7 +113,7 @@ export function EditClientSheet({ cliente, open, onOpenChange, onSuccess }: Edit
       email: email.trim() || null,
       direccion: direccion.trim() || null,
       franquicia_split:
-        cliente.tipo === 'franquicia' ? parseFloat(franqSplit) / 100 : cliente.franquicia_split,
+        cliente.tipo === 'franquicia' ? parseFloat(franqSplit) / 100 : null,
       notas: notas.trim() || null,
     }
     onSuccess?.(updated)

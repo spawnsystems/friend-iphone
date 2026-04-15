@@ -141,7 +141,8 @@ export async function createClienteCompleto(data: {
       email: data.email?.trim() || null,
       direccion: data.direccion?.trim() || null,
       nombre_negocio: data.nombre_negocio?.trim() || null,
-      franquicia_split: data.franquicia_split ?? 0.5,
+      // franquicia_split: only set for franquicia type; NULL for retail/gremio
+      franquicia_split: data.tipo === 'franquicia' ? (data.franquicia_split ?? 0.5) : null,
       notas: data.notas?.trim() || null,
     })
     .select()

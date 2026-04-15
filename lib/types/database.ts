@@ -28,7 +28,7 @@ export interface Cliente {
   email: string | null
   direccion: string | null
   nombre_negocio: string | null
-  franquicia_split: number
+  franquicia_split: number | null  // Only set for franquicia type
   notas: string | null
   activo: boolean
   created_at: string
