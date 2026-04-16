@@ -3,7 +3,14 @@ export type AppRole = 'dueno' | 'empleado' | 'admin'
 export type EstadoReparacion = 'recibido' | 'en_reparacion' | 'listo' | 'entregado' | 'cancelado'
 export type TipoCliente = 'retail' | 'gremio' | 'franquicia'
 export type TipoTelefono = 'comprado' | 'consignacion' | 'pasamanos'
-export type EstadoTelefono = 'en_stock' | 'publicado' | 'vendido' | 'devuelto'
+export type EstadoTelefono = 'en_stock' | 'reservado' | 'vendido' | 'devuelto' | 'publicado'
+export type OrigenTelefono = 'compra_directa' | 'trade_in' | 'consignacion' | 'pasamanos'
+export type CondicionTelefono = 'nuevo' | 'como_nuevo' | 'muy_bueno' | 'bueno' | 'regular' | 'para_repuesto'
+export type CategoriaRepuesto =
+  | 'auricular' | 'sensor_proximidad' | 'flex_carga' | 'parlante' | 'vibrador'
+  | 'lector_sim' | 'bateria' | 'tapa_sin_anclaje' | 'tapa_con_anclaje'
+  | 'modulo_generico' | 'modulo_original' | 'vidrio_oca' | 'camara_trasera'
+  | 'camara_selfie' | 'lente_camara' | 'chapitas'
 export type MetodoPago = 'efectivo_ars' | 'efectivo_usd' | 'transferencia'
 export type TipoMovimientoCaja = 
   | 'ingreso_reparacion' 
@@ -77,12 +84,31 @@ export interface ReparacionResumen {
 export interface Repuesto {
   id: string
   nombre: string
-  modelo_compatible: string[]
+  categoria: CategoriaRepuesto
+  modelos_compatibles: string[]
+  variante: string | null
   cantidad: number
   cantidad_minima: number
+  costo_unitario: number | null  // Only visible to dueño/admin
   ubicacion: string | null
   created_at: string
   updated_at: string
+}
+
+export interface RepuestoConDisponible extends Repuesto {
+  cantidad_reservada: number
+  cantidad_disponible: number
+}
+
+export interface ReparacionRepuesto {
+  id: string
+  reparacion_id: string
+  repuesto_id: string
+  cantidad: number
+  descontado: boolean
+  created_at: string
+  // Joined fields (from repuestos)
+  repuesto?: Repuesto
 }
 
 export interface Telefono {
@@ -91,9 +117,12 @@ export interface Telefono {
   modelo: string
   color: string | null
   capacidad: string | null
+  condicion: CondicionTelefono | null
   estado_bateria: number | null
   tipo: TipoTelefono
   estado: EstadoTelefono
+  origen: OrigenTelefono | null
+  orden_venta_origen: string | null
   consignante_id: string | null
   precio_consignacion_ars: number | null
   pendiente_de_costo: boolean
@@ -101,6 +130,7 @@ export interface Telefono {
   precio_venta_usd: number | null
   fecha_venta: string | null
   comprador_id: string | null
+  cliente_reserva_id: string | null
   notas: string | null
   created_by: string
   created_at: string
@@ -138,8 +168,12 @@ export interface NuevaReparacionForm {
   descripcion_problema: string
 }
 
-// iPhone models for combobox
+// iPhone models for combobox — repairs + stock (iPhone 7 onwards)
 export const IPHONE_MODELS = [
+  'iPhone 17 Pro Max',
+  'iPhone 17 Pro',
+  'iPhone 17 Plus',
+  'iPhone 17',
   'iPhone 16 Pro Max',
   'iPhone 16 Pro',
   'iPhone 16 Plus',
@@ -169,7 +203,43 @@ export const IPHONE_MODELS = [
   'iPhone X',
   'iPhone 8 Plus',
   'iPhone 8',
+  'iPhone 7 Plus',
+  'iPhone 7',
   'iPhone SE (3rd gen)',
   'iPhone SE (2nd gen)',
   'iPhone SE (1st gen)',
 ] as const
+
+export type IphoneModel = (typeof IPHONE_MODELS)[number]
+
+// Capacidades comunes para celulares
+export const CAPACIDADES = ['64GB', '128GB', '256GB', '512GB', '1TB'] as const
+
+// Labels legibles para enums
+export const CATEGORIA_REPUESTO_LABELS: Record<CategoriaRepuesto, string> = {
+  auricular:        'Auricular',
+  sensor_proximidad: 'Sensor de proximidad',
+  flex_carga:       'Flex de carga',
+  parlante:         'Parlante',
+  vibrador:         'Vibrador',
+  lector_sim:       'Lector SIM',
+  bateria:          'Batería',
+  tapa_sin_anclaje: 'Tapa sin anclaje',
+  tapa_con_anclaje: 'Tapa con anclaje',
+  modulo_generico:  'Módulo genérico',
+  modulo_original:  'Módulo original',
+  vidrio_oca:       'Vidrio + OCA',
+  camara_trasera:   'Cámara trasera',
+  camara_selfie:    'Cámara selfie',
+  lente_camara:     'Lente de cámara',
+  chapitas:         'Chapitas',
+}
+
+export const CONDICION_LABELS: Record<CondicionTelefono, string> = {
+  nuevo:        'Nuevo',
+  como_nuevo:   'Como nuevo',
+  muy_bueno:    'Muy bueno',
+  bueno:        'Bueno',
+  regular:      'Regular',
+  para_repuesto: 'Para repuesto',
+}

@@ -11,7 +11,7 @@ import type { AppRole } from '@/lib/types/database'
  */
 export const FEATURES = {
   clientes: true,
-  stock:    false,
+  stock:    true,
   finanzas: false,
   mas:      false,
 } as const

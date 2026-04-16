@@ -14,6 +14,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { StatusBadge } from "@/components/status-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchReparacionById, actualizarReparacion } from "@/app/actions/reparaciones"
+import { RepairRepuestosSection } from "@/components/repair-repuestos-section"
 import type { AppRole, EstadoReparacion, Reparacion } from "@/lib/types/database"
 
 interface RepairDetailSheetProps {
@@ -302,6 +303,26 @@ export function RepairDetailSheet({
                       disabled={isClosed}
                     />
                   </div>
+
+                  {/* ── Repuestos utilizados ── */}
+                  {data && !isClosed && (
+                    <div className="pt-2">
+                      <RepairRepuestosSection
+                        reparacionId={data.id}
+                        modeloReparacion={data.modelo}
+                        disabled={false}
+                      />
+                    </div>
+                  )}
+                  {data && isClosed && (
+                    <div className="pt-2">
+                      <RepairRepuestosSection
+                        reparacionId={data.id}
+                        modeloReparacion={data.modelo}
+                        disabled={true}
+                      />
+                    </div>
+                  )}
 
                   {/* ── Precios — dueño/admin only ── */}
                   {isDueno && (

@@ -237,6 +237,56 @@ export async function actualizarReparacion(
     if (updates.estado === 'entregado')     payload.fecha_entrega           = new Date().toISOString()
   }
 
+  // Descontar stock ANTES de persistir el estado "listo"
+  if (updates.estado === 'listo') {
+    const { data: repuestosRep, error: rrFetchErr } = await supabase
+      .from('reparacion_repuestos')
+      .select('id, repuesto_id, cantidad')
+      .eq('reparacion_id', id)
+      .eq('descontado', false)
+
+    if (rrFetchErr) {
+      console.error('[actualizarReparacion] fetch reparacion_repuestos:', rrFetchErr)
+      return { success: false, error: 'Error al obtener los repuestos de la reparación.' }
+    }
+
+    for (const rr of repuestosRep ?? []) {
+      // Leer cantidad actual del repuesto
+      const { data: repuesto, error: readErr } = await supabase
+        .from('repuestos')
+        .select('cantidad')
+        .eq('id', rr.repuesto_id)
+        .single()
+
+      if (readErr || !repuesto) {
+        console.error('[actualizarReparacion] read repuesto:', readErr)
+        return { success: false, error: `Error al leer stock del repuesto ${rr.repuesto_id}.` }
+      }
+
+      const nuevaCantidad = Math.max(0, repuesto.cantidad - rr.cantidad)
+
+      const { error: writeErr } = await supabase
+        .from('repuestos')
+        .update({ cantidad: nuevaCantidad, updated_at: new Date().toISOString() })
+        .eq('id', rr.repuesto_id)
+
+      if (writeErr) {
+        console.error('[actualizarReparacion] write repuesto:', writeErr)
+        return { success: false, error: `Error al descontar stock del repuesto ${rr.repuesto_id}.` }
+      }
+
+      const { error: markErr } = await supabase
+        .from('reparacion_repuestos')
+        .update({ descontado: true })
+        .eq('id', rr.id)
+
+      if (markErr) {
+        console.error('[actualizarReparacion] mark descontado:', markErr)
+        return { success: false, error: `Error al marcar repuesto ${rr.id} como descontado.` }
+      }
+    }
+  }
+
   const { error } = await supabase.from('reparaciones').update(payload).eq('id', id)
 
   if (error) {
