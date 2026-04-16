@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -66,9 +66,20 @@ function PasswordStrength({ password }: { password: string }) {
 // ─── Update Password Page ─────────────────────────────────────
 
 export default function UpdatePasswordPage() {
+  return (
+    <Suspense>
+      <UpdatePasswordForm />
+    </Suspense>
+  )
+}
+
+function UpdatePasswordForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isRecovery = searchParams.get('mode') === 'recovery'
+
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [showConfirm, setShowConfirm]   = useState(false)
 
   const {
     register,
@@ -102,10 +113,17 @@ export default function UpdatePasswordPage() {
         return
       }
 
-      toast.success('Cuenta activada', {
-        description: 'Tu acceso está listo. Entrando al sistema...',
-        icon: <KeyRound className="size-4 text-primary" />,
-      })
+      if (isRecovery) {
+        toast.success('Contraseña actualizada', {
+          description: 'Podés ingresar con tu nueva contraseña.',
+          icon: <KeyRound className="size-4 text-primary" />,
+        })
+      } else {
+        toast.success('Cuenta activada', {
+          description: 'Tu acceso está listo. Entrando al sistema...',
+          icon: <KeyRound className="size-4 text-primary" />,
+        })
+      }
 
       setTimeout(() => {
         router.push('/')
@@ -125,7 +143,9 @@ export default function UpdatePasswordPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
           <Logo size="lg" />
-          <p className="text-sm text-muted-foreground">Configurar acceso</p>
+          <p className="text-sm text-muted-foreground">
+            {isRecovery ? 'Recuperar acceso' : 'Configurar acceso'}
+          </p>
         </div>
 
         {/* Card */}
@@ -135,10 +155,14 @@ export default function UpdatePasswordPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
                 <KeyRound className="size-4 text-primary" />
               </div>
-              <CardTitle className="text-base font-semibold">Creá tu contraseña</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                {isRecovery ? 'Nueva contraseña' : 'Creá tu contraseña'}
+              </CardTitle>
             </div>
             <CardDescription className="text-[13px]">
-              Sos nuevo en el sistema. Elegí una contraseña segura para activar tu cuenta.
+              {isRecovery
+                ? 'Elegí una contraseña segura para recuperar el acceso a tu cuenta.'
+                : 'Sos nuevo en el sistema. Elegí una contraseña segura para activar tu cuenta.'}
             </CardDescription>
           </CardHeader>
 
@@ -148,7 +172,7 @@ export default function UpdatePasswordPage() {
               {/* Nueva contraseña */}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="password" className="text-sm font-medium">
-                  Nueva contraseña
+                  {isRecovery ? 'Nueva contraseña' : 'Contraseña'}
                 </Label>
                 <div className="relative">
                   <Input
@@ -219,10 +243,10 @@ export default function UpdatePasswordPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    Activando cuenta...
+                    {isRecovery ? 'Guardando...' : 'Activando cuenta...'}
                   </>
                 ) : (
-                  'Activar mi cuenta →'
+                  isRecovery ? 'Guardar contraseña →' : 'Activar mi cuenta →'
                 )}
               </Button>
             </form>
@@ -230,7 +254,9 @@ export default function UpdatePasswordPage() {
         </Card>
 
         <p className="text-center text-[11px] text-muted-foreground/60">
-          Friend iPhone · Invitado por el administrador
+          {isRecovery
+            ? 'Friend iPhone · Recuperación de acceso'
+            : 'Friend iPhone · Invitado por el administrador'}
         </p>
       </div>
     </main>

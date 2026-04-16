@@ -172,8 +172,9 @@ export interface NuevaReparacionForm {
 export const IPHONE_MODELS = [
   'iPhone 17 Pro Max',
   'iPhone 17 Pro',
-  'iPhone 17 Plus',
+  'iPhone Air',
   'iPhone 17',
+  'iPhone 17e',
   'iPhone 16 Pro Max',
   'iPhone 16 Pro',
   'iPhone 16 Plus',
@@ -205,9 +206,9 @@ export const IPHONE_MODELS = [
   'iPhone 8',
   'iPhone 7 Plus',
   'iPhone 7',
-  'iPhone SE (3rd gen)',
-  'iPhone SE (2nd gen)',
-  'iPhone SE (1st gen)',
+  'iPhone SE (3.ª gen)',
+  'iPhone SE (2.ª gen)',
+  'iPhone SE (1.ª gen)',
 ] as const
 
 export type IphoneModel = (typeof IPHONE_MODELS)[number]

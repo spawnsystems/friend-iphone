@@ -102,3 +102,25 @@ export async function changeUserRole(
 
   return { success: true }
 }
+
+// ─── resetUserPassword ────────────────────────────────────────
+// Envía un email de recuperación de contraseña al usuario.
+// Solo puede hacerlo el superadmin.
+
+export async function resetUserPassword(userEmail: string): Promise<ActionResult> {
+  const isAdmin = await checkIsSuperAdmin()
+  if (!isAdmin) return { success: false, error: 'No tenés permisos para esta acción.' }
+
+  const adminClient = createAdminClient()
+
+  const { error } = await adminClient.auth.resetPasswordForEmail(userEmail, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/update-password%3Fmode%3Drecovery`,
+  })
+
+  if (error) {
+    console.error('[resetUserPassword] Error:', error)
+    return { success: false, error: 'No se pudo enviar el email de recuperación.' }
+  }
+
+  return { success: true }
+}

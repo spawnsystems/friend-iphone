@@ -93,6 +93,43 @@ export async function logout() {
   redirect('/login')
 }
 
+// ─── requestPasswordReset ─────────────────────────────────────
+// Valida que el email exista en usuarios antes de enviar el mail.
+// Evita gastar cuota de Supabase en emails a cuentas inexistentes.
+
+export async function requestPasswordReset(email: string): Promise<ActionResult> {
+  const normalizedEmail = email.toLowerCase().trim()
+  const adminClient = createAdminClient()
+
+  // Verificar que el email esté registrado en la app
+  const { data: usuario, error: dbError } = await adminClient
+    .from('usuarios')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+
+  if (dbError) {
+    console.error('[requestPasswordReset] DB error:', dbError)
+    return { success: false, error: 'Error al verificar el email.' }
+  }
+
+  if (!usuario) {
+    return { success: false, error: 'No existe una cuenta registrada con ese email.' }
+  }
+
+  // Email válido — enviar recuperación
+  const { error } = await adminClient.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/update-password%3Fmode%3Drecovery`,
+  })
+
+  if (error) {
+    console.error('[requestPasswordReset] Supabase error:', error)
+    return { success: false, error: 'No se pudo enviar el email de recuperación.' }
+  }
+
+  return { success: true }
+}
+
 // ─── Mapeador de errores de invitación ───────────────────────
 
 function mapInviteError(message: string): string {

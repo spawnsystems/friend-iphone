@@ -2,6 +2,11 @@
 
 Webapp mobile-first para gestión interna de un taller técnico de reparación de iPhones en Buenos Aires. Maneja reparaciones, clientes, inventario, caja y usuarios.
 
+**Estado actual:** Fase 3 (Stock + Recuperación de contraseña) ✅
+- Gestión completa de repuestos con disponibilidad en tiempo real
+- Deducción automática de stock al marcar reparaciones como "listo"
+- Self-service de recuperación de contraseña + asistencia desde el panel admin
+
 ---
 
 ## Stack
@@ -32,7 +37,7 @@ friend-iphone/
 │   │   │   ├── page.tsx          # Lista de clientes (search + filtro por tipo)
 │   │   │   ├── ClientesList.tsx  # Componente cliente interactivo (estado local)
 │   │   │   └── [id]/page.tsx     # Detalle: info, cuenta corriente, historial de reparaciones
-│   │   ├── stock/page.tsx        # Stock (placeholder hasta Fase 3)
+│   │   ├── stock/page.tsx        # Stock — gestión de repuestos y disponibilidad en tiempo real
 │   │   ├── finanzas/page.tsx     # Finanzas — dueño/admin only (placeholder hasta Fase 4)
 │   │   └── mas/page.tsx          # Más (placeholder hasta Fase 5)
 │   ├── layout.tsx                # Root layout (fonts, Toaster, Analytics)
@@ -44,7 +49,7 @@ friend-iphone/
 │   │   └── confirm/              # Route handler para token_hash de Supabase
 │   └── actions/
 │       ├── auth.ts               # login, logout, inviteNewUser, checkIsSuperAdmin
-│       ├── admin.ts              # deactivateUser, reactivateUser, changeUserRole
+│       ├── admin.ts              # deactivateUser, reactivateUser, changeUserRole, resetUserPassword
 │       ├── profile.ts            # updateNombre
 │       ├── data.ts               # fetchReparaciones, fetchAlertas, fetchClientes
 │       ├── reparaciones.ts       # crearReparacion
@@ -134,20 +139,65 @@ Los usuarios **no se registran solos**. El admin invita por email desde `/admin`
 
 ---
 
-## Flujo de invitación
+## Autenticación y gestión de contraseñas
+
+### Flujo de invitación de usuario nuevo
 
 1. Admin completa el form en `/admin` (nombre, email, rol) y confirma
-2. Supabase envía un email con un link a `/auth/confirm?token_hash=...&type=invite`
-3. El route handler verifica el token y crea la sesión
-4. El usuario es redirigido a `/update-password` para elegir su contraseña
-5. Al guardar, queda logueado y entra al sistema
+2. Supabase envía un email con un link de activación seguro
+3. El usuario hace clic en el link → `/auth/confirm` verifica el token
+4. Se crea la sesión y el usuario es redirigido a `/update-password`
+5. El usuario elige su contraseña y queda logueado en el sistema
 
-### Email template requerido en Supabase
+### Flujo de recuperación de contraseña
 
-En **Authentication → Email Templates → Invite user**, el link debe usar:
+**Desde el login (self-service):**
+1. El usuario hace clic en "¿Olvidaste tu contraseña?" en `/login`
+2. Ingresa su email y solicita el link
+3. Recibe un email de recuperación
+4. Hace clic en el link → `/auth/confirm` verifica el token
+5. Es redirigido a `/update-password?mode=recovery` para elegir nueva contraseña
+6. Queda logueado automáticamente
+
+**Desde el panel admin (asistencia):**
+1. Admin va a `/admin` y abre el dropdown de acciones de un usuario
+2. Hace clic en "Restablecer contraseña"
+3. Confirma en el dialog
+4. Se envía un email de recuperación al usuario
+5. El usuario sigue el mismo flujo que arriba
+
+### Email templates requeridos en Supabase
+
+#### Invite user
+En **Authentication → Email Templates → Invite user**, el link debe usar `token_hash`:
 
 ```
 {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/update-password
+```
+
+#### Reset Password
+En **Authentication → Email Templates → Reset Password**, reemplazar con este HTML:
+
+```html
+<h2>Recuperar tu contraseña</h2>
+
+<p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en Friend iPhone.</p>
+
+<p>Haz clic en el siguiente enlace para elegir una nueva contraseña:</p>
+
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/update-password?mode=recovery">
+    Restablecer contraseña
+  </a>
+</p>
+
+<p>Este enlace expira en <strong>1 hora</strong>.</p>
+
+<p>Si no solicitaste este cambio, podés ignorar este email. Tu contraseña permanecerá sin cambios.</p>
+
+<p>
+  <small>Friend iPhone · Taller técnico</small>
+</p>
 ```
 
 ---
@@ -255,6 +305,37 @@ Hay dos flujos según el tipo:
 
 ---
 
+## Stock y Repuestos (`/stock`)
+
+Gestión completa del inventario de repuestos con disponibilidad en tiempo real y deducción automática.
+
+### Características
+
+- **Catálogo de repuestos** — lista filtrable con disponibilidad, precio unitario y ubicación
+- **Categorías** — 16 categorías estándar (auricular, batería, módulo, cámara, etc.)
+- **Modelos compatibles** — cada repuesto especifica qué modelos de iPhone puede reparar
+- **Disponibilidad en tiempo real** — cantidad disponible = cantidad total − lo reservado en reparaciones activas
+
+### Flujo de uso
+
+1. **En reparación:** al editar una reparación, el técnico agrega repuestos desde un combobox filtrable
+   - Autocompletado por nombre o categoría
+   - Muestra disponibilidad actual
+   - Solo permite agregar si hay stock suficiente
+   - Puede aumentar/disminuir cantidad o remover repuesto
+
+2. **Al marcar como "listo":** 
+   - Sistema automáticamente deduce el stock de cada repuesto agregado
+   - Marca internamente con `descontado = true`
+   - Una vez descontado, no se puede remover (auditoria)
+
+3. **Vista de stock:**
+   - Tabla completa con cantidad total, reservada y disponible
+   - Alertas para stock bajo (< cantidad mínima)
+   - Crear/editar repuestos (solo admin)
+
+---
+
 ## Comandos
 
 ```bash
@@ -273,11 +354,20 @@ Las migraciones completas están en `supabase/migrations/`. Las tablas principal
 - `usuarios` — perfil + rol de cada usuario autenticado
 - `clientes` — retail, gremio, franquicia; con cuenta corriente
 - `reparaciones` — registro de cada trabajo, con estados y precios
-- `repuestos` — inventario con alertas de stock mínimo
-- `telefonos` — comprados, consignación y pasamanos
+- `repuestos` — inventario con categoría, modelos compatibles, costo y alertas de stock mínimo
+- `reparacion_repuestos` — asociación de repuestos a reparaciones (incluye flag `descontado` para auditoria)
+- `telefonos` — comprados, consignación, pasamanos; con condición y origen
 - `movimientos_caja` — ingresos y egresos por tipo
 - `cotizaciones` — historial del dólar blue/oficial
 - `cierres_diarios_caja` — cierre de caja por día
+- `v_repuestos_con_disponible` — vista que calcula disponibilidad en tiempo real
+
+**Notas sobre la migración 010:**
+- Agregó campo `descontado` a `reparacion_repuestos` para auditar qué stock fue realmente utilizado
+- Agregó columnas `categoria`, `variante`, `costo_unitario` a `repuestos`
+- Agregó columnas `condicion`, `origen`, `orden_venta_origen`, `cliente_reserva_id` a `telefonos`
+- Creó enums `categoria_repuesto` y `condicion_telefono`
+- Aplicó RLS policies para acceso seguro a `reparacion_repuestos`
 
 ---
 
@@ -286,4 +376,6 @@ Las migraciones completas están en `supabase/migrations/`. Las tablas principal
 - El cliente `admin` (service role) solo se usa en **Server Actions y Route Handlers** — nunca en el browser
 - `SUPERADMIN_EMAIL` es una variable sin `NEXT_PUBLIC_` — solo accesible en el servidor
 - Las rutas `/auth/*` y `/update-password` están excluidas del chequeo de autenticación en el middleware
-- Supabase free plan: límite de ~2 emails de invitación por hora por destinatario. Para producción se recomienda configurar SMTP propio (Resend / SendGrid)
+- Ambos flujos de autenticación (`invite` y `recovery`) usan `token_hash` en lugar de tokens directos en la URL — esto protege contra email scanners que consumen links automáticamente
+- La página `/update-password` detecta el parámetro `?mode=recovery` para adaptar los textos y mensajes al flujo correspondiente
+- Supabase free plan: límite de ~2 emails por hora por destinatario. Para producción se recomienda configurar SMTP propio (Resend / SendGrid)

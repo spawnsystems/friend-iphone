@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { MoreHorizontal, UserX, ArrowLeftRight, UserCheck, Loader2 } from 'lucide-react'
+import { MoreHorizontal, UserX, ArrowLeftRight, UserCheck, Loader2, KeyRound } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -29,7 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { deactivateUser, changeUserRole, reactivateUser } from '@/app/actions/admin'
+import { deactivateUser, changeUserRole, reactivateUser, resetUserPassword } from '@/app/actions/admin'
 
 // ─── Config ───────────────────────────────────────────────────
 
@@ -52,10 +53,11 @@ interface UserActionsProps {
 
 export function UserActions({ userId, userEmail, userNombre, currentRol, isBanned }: UserActionsProps) {
   const router = useRouter()
-  const [showReactivate, setShowReactivate] = useState(false)
-  const [showDeactivate, setShowDeactivate] = useState(false)
-  const [showChangeRole, setShowChangeRole] = useState(false)
-  const [isLoading, setIsLoading]           = useState(false)
+  const [showReactivate, setShowReactivate]       = useState(false)
+  const [showDeactivate, setShowDeactivate]       = useState(false)
+  const [showChangeRole, setShowChangeRole]       = useState(false)
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [isLoading, setIsLoading]                 = useState(false)
 
   const otherRol: 'dueno' | 'empleado' = currentRol === 'dueno' ? 'empleado' : 'dueno'
   const displayName = userNombre || userEmail
@@ -117,6 +119,24 @@ export function UserActions({ userId, userEmail, userNombre, currentRol, isBanne
     router.refresh()
   }
 
+  // ── Restablecer contraseña ────────────────────────────────
+
+  async function handleResetPassword() {
+    setIsLoading(true)
+    const result = await resetUserPassword(userEmail)
+    setIsLoading(false)
+    setShowResetPassword(false)
+
+    if (!result.success) {
+      toast.error('No se pudo enviar el email', { description: result.error })
+      return
+    }
+
+    toast.success('Email enviado', {
+      description: `Se envió un link de recuperación a ${userEmail}.`,
+    })
+  }
+
   return (
     <>
       {/* ── Dropdown trigger ── */}
@@ -132,7 +152,7 @@ export function UserActions({ userId, userEmail, userNombre, currentRol, isBanne
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuContent align="end" className="w-48">
           {isBanned ? (
             /* Usuario baneado → solo Reactivar */
             <DropdownMenuItem
@@ -143,7 +163,7 @@ export function UserActions({ userId, userEmail, userNombre, currentRol, isBanne
               Reactivar
             </DropdownMenuItem>
           ) : (
-            /* Usuario activo → Cambiar rol + Dar de baja */
+            /* Usuario activo → Cambiar rol + Restablecer contraseña + Dar de baja */
             <>
               <DropdownMenuItem
                 onClick={() => setShowChangeRole(true)}
@@ -152,6 +172,14 @@ export function UserActions({ userId, userEmail, userNombre, currentRol, isBanne
                 <ArrowLeftRight className="mr-2 size-4" />
                 Cambiar rol
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowResetPassword(true)}
+                className="cursor-pointer"
+              >
+                <KeyRound className="mr-2 size-4" />
+                Restablecer contraseña
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => setShowDeactivate(true)}
                 className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
@@ -219,6 +247,33 @@ export function UserActions({ userId, userEmail, userNombre, currentRol, isBanne
                 </>
               ) : (
                 'Sí, dar de baja'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── AlertDialog: Restablecer contraseña ── */}
+      <AlertDialog open={showResetPassword} onOpenChange={(o) => { if (!isLoading) setShowResetPassword(o) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restablecer contraseña de {displayName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se enviará un link de recuperación a{' '}
+              <span className="font-medium text-foreground">{userEmail}</span>.
+              El usuario tendrá que hacer clic en el link para elegir una nueva contraseña.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetPassword} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar link'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
