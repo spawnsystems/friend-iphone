@@ -37,12 +37,17 @@ export async function fetchReparaciones(): Promise<ReparacionResumen[]> {
     modelo: r.modelo,
     cliente_nombre: r.cliente_nombre,
     cliente_telefono: r.cliente_telefono,
+    cliente_negocio: r.cliente_negocio ?? null,
     estado: r.estado,
     tipo_servicio: r.tipo_servicio,
     descripcion_problema: r.descripcion_problema,
+    diagnostico: r.diagnostico ?? null,
+    notas_internas: r.notas_internas ?? null,
     fecha_ingreso: r.fecha_ingreso ?? r.created_at,
     costo_reparacion: null, // Cost hidden by default — only shown via owner views
     precio_cliente: r.precio_cliente_ars,
+    precio_cliente_usd: r.precio_cliente_usd ?? null,
+    presupuesto_aprobado: r.presupuesto_aprobado ?? false,
   }))
 }
 

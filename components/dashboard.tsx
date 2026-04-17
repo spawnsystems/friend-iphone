@@ -290,6 +290,7 @@ export function Dashboard({
         role={role}
         onClose={() => setSelectedRepairId(null)}
         onUpdated={handleRefresh}
+        initialData={reparaciones.find((r) => r.id === selectedRepairId)}
       />
     </div>
   )

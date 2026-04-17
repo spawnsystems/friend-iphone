@@ -73,12 +73,17 @@ export interface ReparacionResumen {
   modelo: string
   cliente_nombre: string
   cliente_telefono: string | null
+  cliente_negocio: string | null
   estado: EstadoReparacion
   tipo_servicio: TipoCliente
   descripcion_problema: string
+  diagnostico: string | null
+  notas_internas: string | null
   fecha_ingreso: string
   costo_reparacion: number | null
   precio_cliente: number | null
+  precio_cliente_usd: number | null
+  presupuesto_aprobado: boolean
 }
 
 export interface Repuesto {

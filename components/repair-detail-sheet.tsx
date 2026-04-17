@@ -15,7 +15,7 @@ import { StatusBadge } from "@/components/status-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchReparacionById, actualizarReparacion } from "@/app/actions/reparaciones"
 import { RepairRepuestosSection } from "@/components/repair-repuestos-section"
-import type { AppRole, EstadoReparacion, Reparacion } from "@/lib/types/database"
+import type { AppRole, EstadoReparacion, Reparacion, ReparacionResumen } from "@/lib/types/database"
 
 interface RepairDetailSheetProps {
   reparacionId: string | null
@@ -23,6 +23,8 @@ interface RepairDetailSheetProps {
   onClose: () => void
   /** Called after any successful update so the parent can refresh the list */
   onUpdated: () => void
+  /** Pre-populated data from the list — skips the fetch and opens instantly */
+  initialData?: ReparacionResumen
 }
 
 type ReparacionDetalle = Reparacion & {
@@ -48,6 +50,7 @@ export function RepairDetailSheet({
   role,
   onClose,
   onUpdated,
+  initialData,
 }: RepairDetailSheetProps) {
   const [data, setData]                   = React.useState<ReparacionDetalle | null>(null)
   const [isLoading, setIsLoading]         = React.useState(false)
@@ -71,6 +74,48 @@ export function RepairDetailSheet({
       return
     }
 
+    // Fast path: pre-populate from the list data already in memory.
+    // All fields needed for display are available in ReparacionResumen
+    // (diagnostico, notas_internas, precios, cliente_negocio were added to the view mapping).
+    if (initialData && initialData.id === reparacionId) {
+      const rep: ReparacionDetalle = {
+        // Required Reparacion fields used in the sheet
+        id:                      initialData.id,
+        imei:                    initialData.imei,
+        modelo:                  initialData.modelo,
+        descripcion_problema:    initialData.descripcion_problema,
+        cliente_id:              '',
+        tipo_servicio:           initialData.tipo_servicio,
+        estado:                  initialData.estado,
+        precio_cliente_ars:      initialData.precio_cliente,
+        precio_cliente_usd:      initialData.precio_cliente_usd,
+        presupuesto_aprobado:    initialData.presupuesto_aprobado,
+        franquicia_split_override: null,
+        fecha_ingreso:           initialData.fecha_ingreso,
+        fecha_presupuesto:       null,
+        fecha_inicio_reparacion: null,
+        fecha_listo:             null,
+        fecha_entrega:           null,
+        diagnostico:             initialData.diagnostico,
+        notas_internas:          initialData.notas_internas,
+        created_by:              '',
+        updated_by:              null,
+        created_at:              initialData.fecha_ingreso,
+        updated_at:              initialData.fecha_ingreso,
+        // Extended fields
+        cliente_nombre:          initialData.cliente_nombre,
+        cliente_negocio:         initialData.cliente_negocio,
+      }
+      setData(rep)
+      setDescripcion(rep.descripcion_problema ?? "")
+      setDiagnostico(rep.diagnostico ?? "")
+      setNotas(rep.notas_internas ?? "")
+      setPrecioArs(rep.precio_cliente_ars?.toString() ?? "")
+      setPrecioUsd(rep.precio_cliente_usd?.toString() ?? "")
+      return
+    }
+
+    // Slow path: no pre-populated data, fetch from server
     let cancelled = false
 
     async function load() {
@@ -100,7 +145,7 @@ export function RepairDetailSheet({
 
     load()
     return () => { cancelled = true }
-  }, [reparacionId, onClose])
+  }, [reparacionId, onClose, initialData])
 
   const isClosed = data?.estado === "entregado" || data?.estado === "cancelado"
 

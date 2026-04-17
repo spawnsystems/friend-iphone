@@ -123,9 +123,9 @@ export default async function ClienteDetailPage({ params }: ClienteDetailPagePro
         {cliente.tipo === 'franquicia' && (
           <div className="mt-3 pt-3 border-t border-border/30 flex items-center gap-2 text-[12px] text-muted-foreground">
             <span>Split:</span>
-            <span className="font-semibold text-foreground">{Math.round(cliente.franquicia_split * 100)}% taller</span>
+            <span className="font-semibold text-foreground">{Math.round((cliente.franquicia_split ?? 0) * 100)}% taller</span>
             <span>/</span>
-            <span>{Math.round((1 - cliente.franquicia_split) * 100)}% franquicia</span>
+            <span>{Math.round((1 - (cliente.franquicia_split ?? 0)) * 100)}% franquicia</span>
           </div>
         )}
       </div>
