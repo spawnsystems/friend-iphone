@@ -72,14 +72,15 @@ export async function fetchAlertas(): Promise<Alerta[]> {
 }
 
 // ============================================================
-// Fetch all active clients
+// Fetch active clients — only fields needed for repair dropdown
+// Full client data is in fetchClientesCompleto (clientes page)
 // ============================================================
 export async function fetchClientes(): Promise<Cliente[]> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('clientes')
-    .select('*')
+    .select('id, nombre, nombre_negocio, tipo, telefono, franquicia_split, activo, email, direccion, notas, created_at, updated_at')
     .eq('activo', true)
     .order('nombre', { ascending: true })
 

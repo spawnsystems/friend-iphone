@@ -1,13 +1,13 @@
 'use client'
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AlertCard } from "@/components/alert-card"
 import { RepairCard } from "@/components/repair-card"
 import { NewRepairSheet } from "@/components/new-repair-sheet"
 import { RepairDetailSheet } from "@/components/repair-detail-sheet"
-import { Skeleton } from "@/components/ui/skeleton"
 import type { ReparacionResumen, Alerta, Cliente, AppRole } from "@/lib/types/database"
 
 interface DashboardProps {
@@ -15,8 +15,6 @@ interface DashboardProps {
   alertas: Alerta[]
   clientes: Cliente[]
   role: AppRole | null
-  onRefresh: () => Promise<void>
-  isLoading?: boolean
 }
 
 export function Dashboard({
@@ -24,20 +22,21 @@ export function Dashboard({
   alertas,
   clientes,
   role,
-  onRefresh,
-  isLoading = false,
 }: DashboardProps) {
+  const router = useRouter()
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [selectedRepairId, setSelectedRepairId] = React.useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = React.useState(false)
+  const [isRefreshing, startRefresh] = React.useTransition()
   const [activeTab, setActiveTab] = React.useState<'todos' | 'recibido' | 'en_reparacion' | 'listo'>('todos')
   const [activeSort, setActiveSort] = React.useState<'reciente' | 'antiguo'>('reciente')
   const [activeTipoServicio, setActiveTipoServicio] = React.useState<'todos' | 'retail' | 'gremio' | 'franquicia'>('todos')
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await onRefresh()
-    setIsRefreshing(false)
+  // router.refresh() re-renders the server component and re-fetches data.
+  // useTransition gives us a pending state for the spinner without blocking the UI.
+  const handleRefresh = () => {
+    startRefresh(() => {
+      router.refresh()
+    })
   }
 
   const pendingCount = reparaciones.filter(
@@ -150,7 +149,7 @@ export function Dashboard({
           </div>
 
           {/* Status tabs */}
-          {!isLoading && reparaciones.length > 0 && (
+          {reparaciones.length > 0 && (
             <>
               <div className="flex gap-2 overflow-x-auto pb-1 mb-4 scrollbar-none">
                 {([
@@ -233,13 +232,7 @@ export function Dashboard({
             </>
           )}
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-[120px] rounded-2xl" />
-              ))}
-            </div>
-          ) : reparaciones.length === 0 ? (
+          {reparaciones.length === 0 ? (
             <div className="text-center py-14 px-6">
               <div className="mx-auto w-16 h-16 rounded-full bg-muted/60 flex items-center justify-center mb-4">
                 <Clock className="h-7 w-7 text-muted-foreground/60" />
