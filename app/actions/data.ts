@@ -2,6 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/auth/get-current-user'
+import { getCurrentTenantId } from '@/lib/tenant/server'
+import { dbAdmin, schema } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 import type { ReparacionResumen, Alerta, Cliente, AppRole } from '@/lib/types/database'
 
 // ============================================================
@@ -13,7 +16,8 @@ export async function fetchMiRol(): Promise<AppRole | null> {
 
 // ============================================================
 // Fetch reparaciones activas (not entregado/cancelado)
-// Uses the v_reparaciones_resumen view
+// Uses the v_reparaciones_resumen view — kept on Supabase client
+// because the view relies on RLS (SECURITY INVOKER) for tenant isolation.
 // ============================================================
 export async function fetchReparaciones(): Promise<ReparacionResumen[]> {
   const supabase = await createClient()
@@ -48,6 +52,8 @@ export async function fetchReparaciones(): Promise<ReparacionResumen[]> {
     precio_cliente: r.precio_cliente_ars,
     precio_cliente_usd: r.precio_cliente_usd ?? null,
     presupuesto_aprobado: r.presupuesto_aprobado ?? false,
+    lote_id: r.lote_id ?? null,
+    lote_numero: r.lote_numero ?? null,
   }))
 }
 
@@ -81,18 +87,14 @@ export async function fetchAlertas(): Promise<Alerta[]> {
 // Full client data is in fetchClientesCompleto (clientes page)
 // ============================================================
 export async function fetchClientes(): Promise<Cliente[]> {
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return []
 
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('id, nombre, nombre_negocio, tipo, telefono, franquicia_split, activo, email, direccion, notas, created_at, updated_at')
-    .eq('activo', true)
-    .order('nombre', { ascending: true })
+  const rows = await dbAdmin
+    .select()
+    .from(schema.clientes)
+    .where(and(eq(schema.clientes.tenant_id, tenantId), eq(schema.clientes.activo, true)))
+    .orderBy(schema.clientes.nombre)
 
-  if (error) {
-    console.error('[fetchClientes] Error:', error)
-    return []
-  }
-
-  return data || []
+  return rows as unknown as Cliente[]
 }

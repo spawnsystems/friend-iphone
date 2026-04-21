@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { dbAdmin, schema } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import type { AppRole } from '@/lib/types/database'
 
 /**
@@ -17,10 +18,11 @@ export interface CurrentUser {
   email: string
   nombre: string
   rol: AppRole
+  is_platform_admin: boolean
 }
 
 /**
- * Fetches the current authenticated user + their row from `usuarios`.
+ * Fetches the current authenticated user + their row from `usuarios` via Drizzle.
  * Returns null if not logged in or if the row doesn't exist.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
@@ -31,22 +33,27 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   if (!user?.email) return null
 
-  // Use admin client to bypass RLS — the user row belongs to `user.id`
-  // so this is always safe.
-  const adminClient = createAdminClient()
-  const { data: usuario } = await adminClient
-    .from('usuarios')
-    .select('id, email, nombre, rol')
-    .eq('id', user.id)
-    .single()
+  const rows = await dbAdmin
+    .select({
+      id:                schema.usuarios.id,
+      email:             schema.usuarios.email,
+      nombre:            schema.usuarios.nombre,
+      rol:               schema.usuarios.rol,
+      is_platform_admin: schema.usuarios.is_platform_admin,
+    })
+    .from(schema.usuarios)
+    .where(eq(schema.usuarios.id, user.id))
+    .limit(1)
 
+  const usuario = rows[0]
   if (!usuario) return null
 
   return {
-    id: usuario.id,
-    email: usuario.email,
-    nombre: usuario.nombre,
-    rol: usuario.rol as AppRole,
+    id:                usuario.id,
+    email:             usuario.email,
+    nombre:            usuario.nombre,
+    rol:               usuario.rol as AppRole,
+    is_platform_admin: usuario.is_platform_admin,
   }
 })
 

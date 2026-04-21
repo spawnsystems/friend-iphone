@@ -1,7 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantId } from '@/lib/tenant/server'
+import { dbAdmin, schema } from '@/lib/db'
+import { eq, and, desc } from 'drizzle-orm'
 import type { Cliente, CuentaCorriente, ReparacionResumen } from '@/lib/types/database'
 
 export interface ActionResult {
@@ -16,18 +17,16 @@ export interface CreateClienteResult extends ActionResult {
 // ─── Fetch todos los clientes activos ────────────────────────
 
 export async function fetchClientesCompleto(): Promise<Cliente[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('activo', true)
-    .order('nombre', { ascending: true })
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return []
 
-  if (error) {
-    console.error('[fetchClientesCompleto]', error)
-    return []
-  }
-  return data ?? []
+  const rows = await dbAdmin
+    .select()
+    .from(schema.clientes)
+    .where(and(eq(schema.clientes.tenant_id, tenantId), eq(schema.clientes.activo, true)))
+    .orderBy(schema.clientes.nombre)
+
+  return rows as unknown as Cliente[]
 }
 
 // ─── Fetch detalle de un cliente ─────────────────────────────
@@ -37,45 +36,71 @@ export async function fetchClienteById(id: string): Promise<{
   cuenta: CuentaCorriente | null
   reparaciones: ReparacionResumen[]
 }> {
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { cliente: null, cuenta: null, reparaciones: [] }
 
-  const [clienteRes, cuentaRes, repsRes] = await Promise.all([
-    supabase.from('clientes').select('*').eq('id', id).single(),
-    supabase.from('cuenta_corriente').select('*').eq('cliente_id', id).maybeSingle(),
-    // Query reparaciones directly — v_reparaciones_resumen omits cliente_id so
-    // filtering by it there always returns 0 rows.
-    supabase
-      .from('reparaciones')
-      .select('id, imei, modelo, descripcion_problema, estado, tipo_servicio, precio_cliente_ars, fecha_ingreso, created_at')
-      .eq('cliente_id', id)
-      .order('fecha_ingreso', { ascending: false })
+  const [clienteRows, cuentaRows, repsRows] = await Promise.all([
+    dbAdmin
+      .select()
+      .from(schema.clientes)
+      .where(and(eq(schema.clientes.id, id), eq(schema.clientes.tenant_id, tenantId)))
+      .limit(1),
+
+    dbAdmin
+      .select()
+      .from(schema.cuentaCorriente)
+      .where(
+        and(
+          eq(schema.cuentaCorriente.cliente_id, id),
+          eq(schema.cuentaCorriente.tenant_id, tenantId),
+        ),
+      )
+      .limit(1),
+
+    dbAdmin
+      .select({
+        id:                   schema.reparaciones.id,
+        imei:                 schema.reparaciones.imei,
+        modelo:               schema.reparaciones.modelo,
+        descripcion_problema: schema.reparaciones.descripcion_problema,
+        estado:               schema.reparaciones.estado,
+        tipo_servicio:        schema.reparaciones.tipo_servicio,
+        precio_cliente_ars:   schema.reparaciones.precio_cliente_ars,
+        fecha_ingreso:        schema.reparaciones.fecha_ingreso,
+        created_at:           schema.reparaciones.created_at,
+      })
+      .from(schema.reparaciones)
+      .where(
+        and(
+          eq(schema.reparaciones.cliente_id, id),
+          eq(schema.reparaciones.tenant_id, tenantId),
+        ),
+      )
+      .orderBy(desc(schema.reparaciones.fecha_ingreso))
       .limit(50),
   ])
 
-  if (clienteRes.error) {
-    console.error('[fetchClienteById] cliente:', clienteRes.error)
-    return { cliente: null, cuenta: null, reparaciones: [] }
-  }
+  if (!clienteRows[0]) return { cliente: null, cuenta: null, reparaciones: [] }
 
-  const cliente = clienteRes.data as Cliente
+  const cliente = clienteRows[0] as unknown as Cliente
 
-  const reparaciones = (repsRes.data ?? []).map((r) => ({
-    id: r.id,
-    imei: r.imei,
-    modelo: r.modelo,
-    cliente_nombre: cliente.nombre_negocio ?? cliente.nombre,
-    cliente_telefono: cliente.telefono,
-    estado: r.estado,
-    tipo_servicio: r.tipo_servicio,
+  const reparaciones = repsRows.map((r) => ({
+    id:                   r.id,
+    imei:                 r.imei,
+    modelo:               r.modelo,
+    cliente_nombre:       cliente.nombre_negocio ?? cliente.nombre,
+    cliente_telefono:     cliente.telefono,
+    estado:               r.estado,
+    tipo_servicio:        r.tipo_servicio,
     descripcion_problema: r.descripcion_problema,
-    fecha_ingreso: r.fecha_ingreso ?? r.created_at,
-    costo_reparacion: null,
-    precio_cliente: r.precio_cliente_ars,
+    fecha_ingreso:        r.fecha_ingreso?.toISOString() ?? r.created_at?.toISOString() ?? '',
+    costo_reparacion:     null,
+    precio_cliente:       r.precio_cliente_ars != null ? Number(r.precio_cliente_ars) : null,
   })) as ReparacionResumen[]
 
   return {
     cliente,
-    cuenta: (cuentaRes.data as CuentaCorriente | null) ?? null,
+    cuenta: (cuentaRows[0] as unknown as CuentaCorriente) ?? null,
     reparaciones,
   }
 }
@@ -89,24 +114,26 @@ export async function createClienteRapido(
 ): Promise<CreateClienteResult> {
   if (!nombre.trim()) return { success: false, error: 'El nombre es obligatorio.' }
 
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { success: false, error: 'Sin sesión de tenant.' }
 
-  const { data, error } = await supabase
-    .from('clientes')
-    .insert({
-      tipo: 'retail',
-      nombre: nombre.trim(),
-      telefono: telefono?.trim() || null,
-    })
-    .select()
-    .single()
+  try {
+    const [cliente] = await dbAdmin
+      .insert(schema.clientes)
+      .values({
+        tenant_id: tenantId,
+        tipo:      'retail',
+        nombre:    nombre.trim(),
+        telefono:  telefono?.trim() || null,
+      })
+      .returning()
 
-  if (error) {
-    console.error('[createClienteRapido]', error)
+    if (!cliente) return { success: false, error: 'No se pudo crear el cliente.' }
+    return { success: true, cliente: cliente as unknown as Cliente }
+  } catch (err) {
+    console.error('[createClienteRapido]', err)
     return { success: false, error: 'No se pudo crear el cliente.' }
   }
-
-  return { success: true, cliente: data as Cliente }
 }
 
 // ─── Crear cliente completo (desde panel Clientes) ────────────
@@ -123,49 +150,52 @@ export async function createClienteCompleto(data: {
 }): Promise<CreateClienteResult> {
   if (!data.nombre.trim()) return { success: false, error: 'El nombre es obligatorio.' }
   if (data.tipo === 'franquicia') {
-    if (!data.nombre_negocio?.trim()) return { success: false, error: 'El nombre del negocio es obligatorio para franquicias.' }
-    if (data.franquicia_split === undefined || data.franquicia_split <= 0 || data.franquicia_split >= 1) {
+    if (!data.nombre_negocio?.trim())
+      return { success: false, error: 'El nombre del negocio es obligatorio para franquicias.' }
+    if (
+      data.franquicia_split === undefined ||
+      data.franquicia_split <= 0 ||
+      data.franquicia_split >= 1
+    ) {
       return { success: false, error: 'El split de franquicia debe ser entre 1% y 99%.' }
     }
   }
 
-  const adminClient = createAdminClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { success: false, error: 'Sin sesión de tenant.' }
 
-  // Insert cliente
-  const { data: cliente, error: clienteError } = await adminClient
-    .from('clientes')
-    .insert({
-      tipo: data.tipo,
-      nombre: data.nombre.trim(),
-      telefono: data.telefono?.trim() || null,
-      email: data.email?.trim() || null,
-      direccion: data.direccion?.trim() || null,
-      nombre_negocio: data.nombre_negocio?.trim() || null,
-      // franquicia_split: only set for franquicia type; NULL for retail/gremio
-      franquicia_split: data.tipo === 'franquicia' ? (data.franquicia_split ?? 0.5) : null,
-      notas: data.notas?.trim() || null,
-    })
-    .select()
-    .single()
+  try {
+    const [cliente] = await dbAdmin
+      .insert(schema.clientes)
+      .values({
+        tenant_id:        tenantId,
+        tipo:             data.tipo,
+        nombre:           data.nombre.trim(),
+        telefono:         data.telefono?.trim() || null,
+        email:            data.email?.trim() || null,
+        direccion:        data.direccion?.trim() || null,
+        nombre_negocio:   data.nombre_negocio?.trim() || null,
+        franquicia_split:
+          data.tipo === 'franquicia' ? String(data.franquicia_split ?? 0.5) : null,
+        notas: data.notas?.trim() || null,
+      })
+      .returning()
 
-  if (clienteError) {
-    console.error('[createClienteCompleto] cliente:', clienteError)
+    if (!cliente) return { success: false, error: 'No se pudo crear el cliente.' }
+
+    // Para gremio y franquicia: crear cuenta corriente automáticamente
+    if (data.tipo === 'gremio' || data.tipo === 'franquicia') {
+      await dbAdmin
+        .insert(schema.cuentaCorriente)
+        .values({ tenant_id: tenantId, cliente_id: cliente.id, saldo_ars: '0', saldo_usd: '0' })
+        .onConflictDoNothing()
+    }
+
+    return { success: true, cliente: cliente as unknown as Cliente }
+  } catch (err) {
+    console.error('[createClienteCompleto]', err)
     return { success: false, error: 'No se pudo crear el cliente.' }
   }
-
-  // Para gremio y franquicia: crear cuenta corriente automáticamente
-  if (data.tipo === 'gremio' || data.tipo === 'franquicia') {
-    const { error: cuentaError } = await adminClient
-      .from('cuenta_corriente')
-      .insert({ cliente_id: cliente.id, saldo_ars: 0, saldo_usd: 0 })
-
-    if (cuentaError) {
-      console.error('[createClienteCompleto] cuenta_corriente:', cuentaError)
-      // No fatal — el cliente se creó, solo falló la cuenta corriente
-    }
-  }
-
-  return { success: true, cliente: cliente as Cliente }
 }
 
 // ─── Actualizar cliente ───────────────────────────────────────
@@ -174,15 +204,17 @@ export async function updateCliente(
   id: string,
   data: Partial<Omit<Cliente, 'id' | 'created_at' | 'updated_at'>>,
 ): Promise<ActionResult> {
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { success: false, error: 'Sin sesión de tenant.' }
 
-  const { error } = await supabase
-    .from('clientes')
-    .update({ ...data, updated_at: new Date().toISOString() })
-    .eq('id', id)
-
-  if (error) {
-    console.error('[updateCliente]', error)
+  try {
+    await dbAdmin
+      .update(schema.clientes)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set({ ...(data as any), updated_at: new Date() })
+      .where(and(eq(schema.clientes.id, id), eq(schema.clientes.tenant_id, tenantId)))
+  } catch (err) {
+    console.error('[updateCliente]', err)
     return { success: false, error: 'No se pudo actualizar el cliente.' }
   }
 

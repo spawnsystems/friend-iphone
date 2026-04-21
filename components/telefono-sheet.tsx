@@ -43,7 +43,7 @@ const ESTADO_OPTIONS: { value: EstadoTelefono; label: string }[] = [
 
 const ORIGEN_OPTIONS: { value: OrigenTelefono; label: string }[] = [
   { value: 'compra_directa', label: 'Compra directa' },
-  { value: 'trade_in',       label: 'Trade-in' },
+  { value: 'trade_in',       label: 'Canje' },
   { value: 'consignacion',   label: 'Consignación' },
   { value: 'pasamanos',      label: 'Pasamanos' },
 ]

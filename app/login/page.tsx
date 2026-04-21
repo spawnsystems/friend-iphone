@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Logo } from '@/components/logo'
 import { loginSchema, type LoginFormData } from '@/lib/schemas/auth'
 import { createClient } from '@/lib/supabase/client'
 import { requestPasswordReset } from '@/app/actions/auth'
@@ -159,10 +158,7 @@ function LoginForm() {
       <main className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm space-y-8">
 
-          <div className="flex flex-col items-center gap-2">
-            <Logo size="lg" />
-            <p className="text-sm text-muted-foreground">Taller técnico · Buenos Aires</p>
-          </div>
+          <SpawnWordmark />
 
           <Card className="border-border/50 shadow-sm">
             <CardHeader className="pb-4 pt-6">
@@ -246,7 +242,7 @@ function LoginForm() {
           </Card>
 
           <p className="text-center text-[11px] text-muted-foreground/60">
-            Friend iPhone · Acceso restringido
+            Spawn · Plataforma de gestión para talleres
           </p>
         </div>
       </main>
@@ -259,11 +255,7 @@ function LoginForm() {
     <main className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
 
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-2">
-          <Logo size="lg" />
-          <p className="text-sm text-muted-foreground">Taller técnico · Buenos Aires</p>
-        </div>
+        <SpawnWordmark />
 
         {/* Card */}
         <Card className="border-border/50 shadow-sm">
@@ -362,9 +354,24 @@ function LoginForm() {
         </Card>
 
         <p className="text-center text-[11px] text-muted-foreground/60">
-          Friend iPhone · Acceso restringido
+          Spawn · Plataforma de gestión para talleres
         </p>
       </div>
     </main>
+  )
+}
+
+// ── Wordmark de la plataforma ─────────────────────────────────
+// Reemplazar con <img src="/spawn-logo.png" /> cuando esté disponible el asset.
+
+function SpawnWordmark() {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/spawn-logo.png" alt="Spawn" className="h-28 w-auto" />
+      <p className="text-[13px] text-muted-foreground">
+        Gestión para talleres técnicos
+      </p>
+    </div>
   )
 }

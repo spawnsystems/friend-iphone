@@ -14,9 +14,13 @@ interface StockPageProps {
   telefonos: Telefono[]
   tradeins: Telefono[]
   role: AppRole | null
+  modules: string[]
 }
 
-export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelefonos, tradeins: initialTradeins, role }: StockPageProps) {
+export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelefonos, tradeins: initialTradeins, role, modules }: StockPageProps) {
+  const hasDevices = modules.includes('stock_devices')
+  const hasTradeIn = modules.includes('trade_in')
+
   const [activeTab, setActiveTab] = React.useState('repuestos')
   const [repuestos, setRepuestos] = React.useState(initialRepuestos)
   const [telefonos, setTelefonos] = React.useState(initialTelefonos)
@@ -58,11 +62,13 @@ export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelef
   }
 
   const fabLabel =
-    activeTab === 'repuestos'
-      ? 'Repuesto'
-      : activeTab === 'celulares'
-      ? 'Celular'
-      : 'Trade-in'
+    activeTab === 'repuestos' ? 'Repuesto'
+    : activeTab === 'celulares' ? 'Celular'
+    : 'Canje'
+
+  // Número de columnas del grid de tabs según módulos habilitados
+  const tabCount = 1 + (hasDevices ? 1 : 0) + (hasTradeIn ? 1 : 0)
+  const gridCols = tabCount === 1 ? 'grid-cols-1' : tabCount === 2 ? 'grid-cols-2' : 'grid-cols-3'
 
   return (
     <>
@@ -70,7 +76,7 @@ export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelef
         <h1 className="text-[22px] font-bold tracking-tight text-foreground mb-5">Stock</h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-3 h-10 rounded-xl bg-secondary/50 p-1 mb-5">
+          <TabsList className={`w-full grid ${gridCols} h-10 rounded-xl bg-secondary/50 p-1 mb-5`}>
             <TabsTrigger
               value="repuestos"
               className="rounded-lg text-[13px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
@@ -78,20 +84,24 @@ export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelef
               <Package className="h-3.5 w-3.5 mr-1.5" />
               Repuestos
             </TabsTrigger>
-            <TabsTrigger
-              value="celulares"
-              className="rounded-lg text-[13px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Smartphone className="h-3.5 w-3.5 mr-1.5" />
-              Celulares
-            </TabsTrigger>
-            <TabsTrigger
-              value="tradein"
-              className="rounded-lg text-[13px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
-              Trade-in
-            </TabsTrigger>
+            {hasDevices && (
+              <TabsTrigger
+                value="celulares"
+                className="rounded-lg text-[13px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Smartphone className="h-3.5 w-3.5 mr-1.5" />
+                Celulares
+              </TabsTrigger>
+            )}
+            {hasTradeIn && (
+              <TabsTrigger
+                value="tradein"
+                className="rounded-lg text-[13px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
+                Canje
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="repuestos" className="mt-0">
@@ -105,26 +115,30 @@ export function StockPage({ repuestos: initialRepuestos, telefonos: initialTelef
             />
           </TabsContent>
 
-          <TabsContent value="celulares" className="mt-0">
-            <CelularesTab
-              telefonos={telefonos}
-              role={role}
-              onTelefonoCreated={handleTelefonoCreated}
-              onTelefonoUpdated={handleTelefonoUpdated}
-              newSheetOpen={celularSheetOpen}
-              onNewSheetOpenChange={setCelularSheetOpen}
-            />
-          </TabsContent>
+          {hasDevices && (
+            <TabsContent value="celulares" className="mt-0">
+              <CelularesTab
+                telefonos={telefonos}
+                role={role}
+                onTelefonoCreated={handleTelefonoCreated}
+                onTelefonoUpdated={handleTelefonoUpdated}
+                newSheetOpen={celularSheetOpen}
+                onNewSheetOpenChange={setCelularSheetOpen}
+              />
+            </TabsContent>
+          )}
 
-          <TabsContent value="tradein" className="mt-0">
-            <TradeInTab
-              tradeins={tradeins}
-              onTradeInCreated={handleTradeInCreated}
-              onTradeInUpdated={handleTradeInUpdated}
-              newSheetOpen={tradeInSheetOpen}
-              onNewSheetOpenChange={setTradeInSheetOpen}
-            />
-          </TabsContent>
+          {hasTradeIn && (
+            <TabsContent value="tradein" className="mt-0">
+              <TradeInTab
+                tradeins={tradeins}
+                onTradeInCreated={handleTradeInCreated}
+                onTradeInUpdated={handleTradeInUpdated}
+                newSheetOpen={tradeInSheetOpen}
+                onNewSheetOpenChange={setTradeInSheetOpen}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

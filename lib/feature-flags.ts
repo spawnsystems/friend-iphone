@@ -13,7 +13,7 @@ export const FEATURES = {
   clientes: true,
   stock:    true,
   finanzas: false,
-  mas:      false,
+  mas:      true,
 } as const
 
 export type FeatureKey = keyof typeof FEATURES

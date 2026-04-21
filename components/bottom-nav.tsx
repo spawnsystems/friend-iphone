@@ -8,47 +8,42 @@ import {
   Package,
   Banknote,
   Grid2x2,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppRole } from '@/lib/types/database'
 
 interface NavItem {
-  href: string
-  label: string
-  icon: LucideIcon
-  /** Roles that see this item. Undefined = all roles. */
-  roles?: AppRole[]
+  href:    string
+  label:   string
+  icon:    LucideIcon
+  roles?:  AppRole[]
+  module?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/',         label: 'Taller',   icon: Wrench },
-  { href: '/clientes', label: 'Clientes', icon: Users },
-  { href: '/stock',    label: 'Stock',    icon: Package },
-  { href: '/finanzas', label: 'Finanzas', icon: Banknote, roles: ['dueno', 'admin'] },
+  { href: '/',         label: 'Taller',   icon: Wrench,      module: 'repairs' },
+  { href: '/clientes', label: 'Clientes', icon: Users,       module: 'customers' },
+  { href: '/stock',    label: 'Stock',    icon: Package,     module: 'stock_parts' },
+  { href: '/finanzas', label: 'Finanzas', icon: Banknote,    roles: ['dueno', 'admin'], module: 'finance' },
+  { href: '/equipo',   label: 'Equipo',   icon: UsersRound,  roles: ['dueno', 'admin'] },
   { href: '/mas',      label: 'Más',      icon: Grid2x2 },
 ]
 
 interface BottomNavProps {
-  rol: AppRole
+  rol:     AppRole
+  modules: string[]
 }
 
-/**
- * Bottom navigation bar — mobile only (hidden on desktop).
- *
- * Adapts to the user's role:
- *   - empleado: 4 slots (Taller, Clientes, Stock, Más)
- *   - dueno/admin: 5 slots (adds Finanzas)
- *
- * Each slot flex-grows evenly. Active route is highlighted with a primary
- * top-bar and bold foreground color. Safe-area padding handles iPhone notch.
- */
-export function BottomNav({ rol }: BottomNavProps) {
+export function BottomNav({ rol, modules }: BottomNavProps) {
   const pathname = usePathname()
 
-  const items = NAV_ITEMS.filter(
-    (item) => !item.roles || item.roles.includes(rol),
-  )
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.roles && !item.roles.includes(rol)) return false
+    if (item.module && !modules.includes(item.module)) return false
+    return true
+  })
 
   return (
     <nav
@@ -74,7 +69,6 @@ export function BottomNav({ rol }: BottomNavProps) {
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
-                {/* Active top indicator bar */}
                 {isActive && (
                   <span
                     aria-hidden
@@ -82,10 +76,7 @@ export function BottomNav({ rol }: BottomNavProps) {
                   />
                 )}
                 <item.icon
-                  className={cn(
-                    'h-[22px] w-[22px] transition-transform',
-                    isActive && 'scale-105',
-                  )}
+                  className={cn('h-[22px] w-[22px] transition-transform', isActive && 'scale-105')}
                   strokeWidth={isActive ? 2.25 : 1.75}
                 />
                 <span

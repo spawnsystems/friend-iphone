@@ -1,14 +1,14 @@
-import { getCurrentUserRole } from '@/lib/auth/get-current-user'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { notFound, redirect } from 'next/navigation'
+import { hasModule } from '@/lib/modules/hasModule'
+import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { ConstructionPlaceholder } from '@/components/construction-placeholder'
 
 export default async function FinanzasPage() {
-  const rol = await getCurrentUserRole()
+  const [enabled, user] = await Promise.all([hasModule('finance'), getCurrentUser()])
 
-  if (!isFeatureEnabled('finanzas', rol)) {
-    return <ConstructionPlaceholder section="Finanzas" />
-  }
+  if (!enabled) notFound()
+  if (!user || (user.rol !== 'dueno' && user.rol !== 'admin')) redirect('/')
 
   // TODO Fase 4: implementación real
-  return null
+  return <ConstructionPlaceholder section="Finanzas" />
 }

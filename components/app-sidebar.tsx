@@ -8,49 +8,48 @@ import {
   Package,
   Banknote,
   Grid2x2,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { UserMenu } from '@/components/user-menu'
 import { cn } from '@/lib/utils'
+import { useTenant } from '@/lib/tenant/context'
 import type { AppRole } from '@/lib/types/database'
 
 interface NavItem {
-  href: string
-  label: string
-  icon: LucideIcon
-  roles?: AppRole[]
+  href:    string
+  label:   string
+  icon:    LucideIcon
+  /** Roles que ven este item. Undefined = todos */
+  roles?:  AppRole[]
+  /** Módulo requerido para que aparezca. Undefined = siempre visible */
+  module?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/',         label: 'Taller',   icon: Wrench },
-  { href: '/clientes', label: 'Clientes', icon: Users },
-  { href: '/stock',    label: 'Stock',    icon: Package },
-  { href: '/finanzas', label: 'Finanzas', icon: Banknote, roles: ['dueno', 'admin'] },
+  { href: '/',         label: 'Taller',   icon: Wrench,      module: 'repairs' },
+  { href: '/clientes', label: 'Clientes', icon: Users,       module: 'customers' },
+  { href: '/stock',    label: 'Stock',    icon: Package,     module: 'stock_parts' },
+  { href: '/finanzas', label: 'Finanzas', icon: Banknote,    roles: ['dueno', 'admin'], module: 'finance' },
+  { href: '/equipo',   label: 'Equipo',   icon: UsersRound,  roles: ['dueno', 'admin'] },
   { href: '/mas',      label: 'Más',      icon: Grid2x2 },
 ]
 
 interface AppSidebarProps {
-  rol: AppRole
+  rol:     AppRole
+  modules: string[]
 }
 
-/**
- * Desktop sidebar — hidden on mobile (lg:flex only).
- *
- * Fixed 240px column on the left with:
- *   - Logo at top
- *   - Nav items in the middle (filtered by role)
- *   - UserMenu pinned at bottom
- *
- * Active item: primary-tinted background + primary text.
- * Inactive: muted text with hover state.
- */
-export function AppSidebar({ rol }: AppSidebarProps) {
+export function AppSidebar({ rol, modules }: AppSidebarProps) {
   const pathname = usePathname()
+  const tenant   = useTenant()
 
-  const items = NAV_ITEMS.filter(
-    (item) => !item.roles || item.roles.includes(rol),
-  )
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.roles && !item.roles.includes(rol)) return false
+    if (item.module && !modules.includes(item.module)) return false
+    return true
+  })
 
   return (
     <aside
@@ -59,7 +58,18 @@ export function AppSidebar({ rol }: AppSidebarProps) {
     >
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-border/30">
-        <Logo size="sm" />
+        {tenant?.logo_url ? (
+          <Link href="/" aria-label="Ir al inicio">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={tenant.logo_url}
+              alt={tenant.nombre}
+              className="h-12 w-auto max-w-[180px] object-contain"
+            />
+          </Link>
+        ) : (
+          <Logo size="sm" />
+        )}
       </div>
 
       {/* Nav items */}

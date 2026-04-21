@@ -84,6 +84,55 @@ export interface ReparacionResumen {
   precio_cliente: number | null
   precio_cliente_usd: number | null
   presupuesto_aprobado: boolean
+  // Lote (null = ingreso individual)
+  lote_id: string | null
+  lote_numero: number | null
+}
+
+export type EstadoLote = 'abierto' | 'cerrado'
+
+export interface Lote {
+  id: string
+  tenant_id: string
+  numero: number
+  cliente_id: string
+  fecha: string
+  estado: EstadoLote
+  notas: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LoteResumen extends Lote {
+  cliente_nombre: string
+  cliente_nombre_negocio: string | null
+  cliente_tipo: TipoCliente
+  creado_por_nombre: string | null
+  total_reparaciones: number
+  cant_recibidas: number
+  cant_en_reparacion: number
+  cant_listas: number
+  cant_entregadas: number
+  cant_canceladas: number
+  total_precio_ars: number
+  total_precio_usd: number
+  total_venta_franquicia_ars: number
+  todas_finalizadas: boolean | null
+}
+
+export interface PrecioGremio {
+  id: string
+  tenant_id: string
+  modelo: string
+  tipo_reparacion: string
+  repuesto_id: string | null
+  repuesto_nombre: string | null
+  costo_ars: string
+  precio_ars: string
+  activo: boolean
+  updated_at: string
+  actualizado_por: string | null
 }
 
 export interface Repuesto {

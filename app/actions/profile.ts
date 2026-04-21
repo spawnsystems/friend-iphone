@@ -1,12 +1,12 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth/get-current-user'
+import { dbAdmin, schema } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import type { ActionResult } from './auth'
 
 // ─── updateNombre ─────────────────────────────────────────────
 // Actualiza el nombre del usuario autenticado en la tabla usuarios.
-// Usa el admin client para no depender de RLS (que se configurará después).
 
 export async function updateNombre(nombre: string): Promise<ActionResult> {
   const trimmed = nombre.trim()
@@ -14,21 +14,16 @@ export async function updateNombre(nombre: string): Promise<ActionResult> {
     return { success: false, error: 'El nombre debe tener al menos 2 caracteres.' }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const currentUser = await getCurrentUser()
+  if (!currentUser) return { success: false, error: 'No autenticado.' }
 
-  if (!user) return { success: false, error: 'No autenticado.' }
-
-  const adminClient = createAdminClient()
-  const { error } = await adminClient
-    .from('usuarios')
-    .update({ nombre: trimmed })
-    .eq('id', user.id)
-
-  if (error) {
-    console.error('[updateNombre] DB error:', error)
+  try {
+    await dbAdmin
+      .update(schema.usuarios)
+      .set({ nombre: trimmed })
+      .where(eq(schema.usuarios.id, currentUser.id))
+  } catch (err) {
+    console.error('[updateNombre] DB error:', err)
     return { success: false, error: 'No se pudo actualizar el nombre.' }
   }
 

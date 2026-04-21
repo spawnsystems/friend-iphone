@@ -8,25 +8,11 @@ import './globals.css'
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: 'Friend iPhone | Taller Tecnico',
-  description: 'Sistema de gestion para taller tecnico de reparacion de iPhones',
-  generator: 'v0.app',
+  title: 'Spawn',
+  description: 'Sistema de gestión para talleres técnicos',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/Icon.png',
+    apple: '/Icon.png',
   },
 }
 

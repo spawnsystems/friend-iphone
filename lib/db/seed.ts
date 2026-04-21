@@ -13,10 +13,12 @@
 // El seed es idempotente: puede correrse varias veces sin duplicar datos.
 // ============================================================
 
-import 'dotenv/config'
+import dotenv from 'dotenv'
 import postgres from 'postgres'
+
+dotenv.config({ path: '.env.local' })
 import { drizzle } from 'drizzle-orm/postgres-js'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { createClient } from '@supabase/supabase-js'
 import * as schema from './schema'
 
@@ -66,6 +68,9 @@ async function upsertAuthUser(email: string, password: string, metadata: Record<
 // ── Main seed ─────────────────────────────────────────────────
 async function main() {
   console.log('\n🌱 Iniciando seed...\n')
+  // Debug: verificar que la URL se está leyendo correctamente
+  const url = process.env.DATABASE_URL ?? 'UNDEFINED'
+  console.log('  🔍 DATABASE_URL:', url.replace(/:([^:@]+)@/, ':***@')) // oculta la password
 
   // ── 1. Tenant "Friend iPhone" ─────────────────────────────
   console.log('📦 Tenant: Friend iPhone')
@@ -128,41 +133,36 @@ async function main() {
 
   console.log(`  ✓ Ale: usuario ${aleUsuario.id}, miembro del tenant ${tenant.nombre}`)
 
-  // ── 3. Usuario: Niko (platform admin) ────────────────────
-  console.log('\n👤 Usuario: Niko (platform admin)')
-  const NIKO_EMAIL    = process.env.SEED_NIKO_EMAIL    ?? process.env.SUPERADMIN_EMAIL ?? 'niko@spawn.com'
-  const NIKO_PASSWORD = process.env.SEED_NIKO_PASSWORD ?? 'cambiar-esto-67890'
+  // ── 3. Usuario: Leo (platform admin) ────────────────────
+  console.log('\n👤 Usuario: Leo (platform admin)')
+  const LEO_EMAIL    = process.env.SEED_LEO_EMAIL    ?? process.env.SUPERADMIN_EMAIL ?? 'leo@spawn.com'
+  const LEO_PASSWORD = process.env.SEED_LEO_PASSWORD ?? 'cambiar-esto-67890'
 
-  const nikoAuthId = await upsertAuthUser(NIKO_EMAIL, NIKO_PASSWORD, { nombre: 'Niko' })
+  const leoAuthId = await upsertAuthUser(LEO_EMAIL, LEO_PASSWORD, { nombre: 'Leo' })
 
-  const [nikoUsuario] = await db
+  const [leoUsuario] = await db
     .insert(schema.usuarios)
     .values({
-      id:                nikoAuthId,
-      email:             NIKO_EMAIL,
-      nombre:            'Niko',
+      id:                leoAuthId,
+      email:             LEO_EMAIL,
+      nombre:            'Leo',
       rol:               'admin',
       activo:            true,
       is_platform_admin: true,
     })
     .onConflictDoUpdate({
       target: schema.usuarios.id,
-      set: { is_platform_admin: true, rol: 'admin', activo: true },
+      set: { nombre: 'Leo', is_platform_admin: true, rol: 'admin', activo: true },
     })
     .returning()
 
-  // Niko también es miembro del tenant Friend iPhone (para poder ver la data)
+  // Modelo A: platform admins NO son miembros de ningún tenant.
+  // Eliminamos cualquier membresía existente de Leo para limpiar datos anteriores.
   await db
-    .insert(schema.tenantMembers)
-    .values({
-      tenant_id: tenant.id,
-      user_id:   nikoUsuario.id,
-      rol:       'admin',
-      activo:    true,
-    })
-    .onConflictDoNothing()
+    .delete(schema.tenantMembers)
+    .where(eq(schema.tenantMembers.user_id, leoUsuario.id))
 
-  console.log(`  ✓ Niko: usuario ${nikoUsuario.id}, platform_admin = true`)
+  console.log(`  ✓ Leo: usuario ${leoUsuario.id}, platform_admin = true (sin tenant_member)`)
 
   // ── 4. Módulos habilitados para Friend iPhone ─────────────
   console.log('\n🔧 Módulos: habilitando todo para Friend iPhone (plan business)')
@@ -183,7 +183,7 @@ async function main() {
   console.log('\n✅ Seed completado.\n')
   console.log('  Tenant ID:   ', tenant.id)
   console.log('  Ale email:   ', ALE_EMAIL)
-  console.log('  Niko email:  ', NIKO_EMAIL)
+  console.log('  Leo email:   ', LEO_EMAIL)
   console.log('\n⚠️  Recordá cambiar las contraseñas de seed antes de ir a producción.\n')
 }
 

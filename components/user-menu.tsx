@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { checkIsSuperAdmin } from '@/app/actions/auth'
+import { useTenant } from '@/lib/tenant/context'
 
 const ROL_LABELS: Record<string, string> = {
   dueno: 'Dueño',
@@ -95,11 +96,11 @@ export function UserMenu() {
         </DropdownMenuItem>
         {isSuperAdmin && (
           <DropdownMenuItem
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/platform')}
             className="cursor-pointer"
           >
             <Settings className="mr-2 size-4" />
-            Panel admin
+            Panel plataforma
           </DropdownMenuItem>
         )}
 

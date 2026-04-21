@@ -1,20 +1,24 @@
+import { notFound } from 'next/navigation'
+import { hasModule } from '@/lib/modules/hasModule'
+import { getCurrentTenant } from '@/lib/tenant/server'
 import { getCurrentUserRole } from '@/lib/auth/get-current-user'
-import { isFeatureEnabled } from '@/lib/feature-flags'
-import { ConstructionPlaceholder } from '@/components/construction-placeholder'
 import { fetchRepuestos, fetchTelefonos, fetchTradeIns } from '@/app/actions/stock'
 import { StockPage } from './StockPage'
 
 export default async function StockPageRoute() {
-  const rol = await getCurrentUserRole()
+  if (!(await hasModule('stock_parts'))) notFound()
 
-  if (!isFeatureEnabled('stock', rol)) {
-    return <ConstructionPlaceholder section="Stock" />
-  }
+  const [tenant, rol] = await Promise.all([getCurrentTenant(), getCurrentUserRole()])
+  const modules = tenant?.modules ?? []
 
+  const hasDevices  = modules.includes('stock_devices')
+  const hasTradeIn  = modules.includes('trade_in')
+
+  // Solo fetchear lo que está habilitado
   const [repuestos, telefonos, tradeins] = await Promise.all([
     fetchRepuestos(),
-    fetchTelefonos(),
-    fetchTradeIns(),
+    hasDevices ? fetchTelefonos()  : Promise.resolve([]),
+    hasTradeIn ? fetchTradeIns()   : Promise.resolve([]),
   ])
 
   return (
@@ -23,6 +27,7 @@ export default async function StockPageRoute() {
       telefonos={telefonos}
       tradeins={tradeins}
       role={rol}
+      modules={modules}
     />
   )
 }

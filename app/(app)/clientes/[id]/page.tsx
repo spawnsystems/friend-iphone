@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { hasModule } from '@/lib/modules/hasModule'
 import Link from 'next/link'
 import { ArrowLeft, Phone, Mail, MapPin, FileText, Building2, Store, User, TrendingDown } from 'lucide-react'
 import { fetchClienteById } from '@/app/actions/clientes'
@@ -26,6 +27,8 @@ interface ClienteDetailPageProps {
 }
 
 export default async function ClienteDetailPage({ params }: ClienteDetailPageProps) {
+  if (!(await hasModule('customers'))) notFound()
+
   const { id } = await params
   const { cliente, cuenta, reparaciones } = await fetchClienteById(id)
 

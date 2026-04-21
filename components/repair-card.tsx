@@ -69,12 +69,17 @@ export function RepairCard({ reparacion, className, onClick }: RepairCardProps) 
           {reparacion.descripcion_problema}
         </p>
 
-        {/* Footer: Type + Date */}
+        {/* Footer: Type + Lote badge + Date */}
         <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary/70 text-[11px] font-medium text-muted-foreground">
               {tipoLabel[reparacion.tipo_servicio] || reparacion.tipo_servicio}
             </span>
+            {reparacion.lote_numero != null && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-[11px] font-semibold text-primary border border-primary/20">
+                L-{reparacion.lote_numero}
+              </span>
+            )}
             <span className="text-[11px] text-muted-foreground/60">
               {formatRelativeDate(reparacion.fecha_ingreso)}
             </span>

@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, text, boolean, timestamp, numeric,
+  pgTable, uuid, text, boolean, timestamp, numeric, primaryKey,
 } from 'drizzle-orm/pg-core'
 import {
   monedaEnum, metodoPagoEnum,
@@ -9,6 +9,7 @@ import { tenants } from './tenants'
 import { usuarios } from './users'
 import { clientes } from './customers'
 import { cuentaCorriente } from './customers'
+import { lotes } from './repairs'
 
 // ── cotizaciones ──────────────────────────────────────────────
 export const cotizaciones = pgTable('cotizaciones', {
@@ -114,6 +115,17 @@ export const cierresDiariosCaja = pgTable('cierres_diarios_caja', {
   cerrado_por:     uuid('cerrado_por').notNull().references(() => usuarios.id),
   created_at:      timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
+
+// ── cierre_lotes ──────────────────────────────────────────────
+// Junction: un cierre de cuenta puede cubrir N lotes específicos.
+// Si un cierre no tiene filas aquí → cierre por período (comportamiento histórico).
+// Si tiene filas → cierre puntual de esos lotes.
+export const cierreLotes = pgTable('cierre_lotes', {
+  cierre_id: uuid('cierre_id').notNull().references(() => cierresCuenta.id, { onDelete: 'cascade' }),
+  lote_id:   uuid('lote_id').notNull().references(() => lotes.id,           { onDelete: 'cascade' }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.cierre_id, t.lote_id] }),
+}))
 
 // ── arqueos_caja ──────────────────────────────────────────────
 export const arqueosCaja = pgTable('arqueos_caja', {

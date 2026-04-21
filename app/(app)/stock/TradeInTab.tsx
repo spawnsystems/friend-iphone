@@ -39,7 +39,7 @@ export function TradeInTab({
       return
     }
 
-    toast.success('Trade-in movido a stock')
+    toast.success('Canje movido a stock')
     onTradeInUpdated({ ...telefono, estado: 'en_stock' })
   }
 
@@ -57,9 +57,9 @@ export function TradeInTab({
           <div className="mx-auto w-16 h-16 rounded-full bg-muted/60 flex items-center justify-center mb-4">
             <ArrowLeftRight className="h-7 w-7 text-muted-foreground/60" />
           </div>
-          <h3 className="font-semibold text-foreground text-base mb-1">Sin trade-ins</h3>
+          <h3 className="font-semibold text-foreground text-base mb-1">Sin canjes</h3>
           <p className="text-[13px] text-muted-foreground max-w-[220px] mx-auto leading-relaxed">
-            Registrá el primer trade-in con el botón Trade-in
+            Registrá el primer canje con el botón Canje
           </p>
         </div>
       ) : (

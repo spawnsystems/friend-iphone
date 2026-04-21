@@ -17,20 +17,13 @@ export interface InviteResult extends ActionResult {
 }
 
 // ─── checkIsSuperAdmin ────────────────────────────────────────
-// Compara el email del usuario logueado con SUPERADMIN_EMAIL (sin NEXT_PUBLIC_,
-// nunca llega al browser).
+// Mantiene compatibilidad con código existente.
+// En Fase 3+: usa is_platform_admin de la tabla usuarios (via Drizzle).
 
 export async function checkIsSuperAdmin(): Promise<boolean> {
-  const superAdminEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase()
-  if (!superAdminEmail) return false
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) return false
-
-  return user.email.trim().toLowerCase() === superAdminEmail
+  const { getCurrentUser } = await import('@/lib/auth/get-current-user')
+  const user = await getCurrentUser()
+  return user?.is_platform_admin ?? false
 }
 
 // ─── inviteNewUser ────────────────────────────────────────────

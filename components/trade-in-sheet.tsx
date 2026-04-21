@@ -80,7 +80,7 @@ export function TradeInSheet({ open, onOpenChange, telefono, onSuccess }: TradeI
       return
     }
 
-    toast.success('Trade-in movido a stock para venta')
+    toast.success('Canje movido a stock para venta')
     onSuccess({ ...telefono, estado: 'en_stock' })
     onOpenChange(false)
   }
@@ -116,7 +116,7 @@ export function TradeInSheet({ open, onOpenChange, telefono, onSuccess }: TradeI
           return
         }
 
-        toast.success('Trade-in actualizado')
+        toast.success('Canje actualizado')
         onSuccess({
           ...telefono,
           imei: form.imei.trim(),
@@ -140,11 +140,11 @@ export function TradeInSheet({ open, onOpenChange, telefono, onSuccess }: TradeI
         })
 
         if (!result.success || !result.telefono) {
-          toast.error('Error al registrar trade-in', { description: result.error })
+          toast.error('Error al registrar canje', { description: result.error })
           return
         }
 
-        toast.success('Trade-in registrado')
+        toast.success('Canje registrado')
         onSuccess(result.telefono)
         onOpenChange(false)
       }
@@ -169,12 +169,12 @@ export function TradeInSheet({ open, onOpenChange, telefono, onSuccess }: TradeI
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-[20px] font-bold tracking-tight text-foreground">
-                    {isEditing ? 'Detalle Trade-in' : 'Nuevo Trade-in'}
+                    {isEditing ? 'Detalle canje' : 'Nuevo canje'}
                   </h2>
                   <p className="text-[13px] text-muted-foreground mt-0.5">
                     {isEditing
                       ? `${telefono.modelo} · ${isPendiente ? 'Pendiente de destino' : 'En stock'}`
-                      : 'Registrá el teléfono recibido como trade-in'}
+                      : 'Registrá el teléfono recibido como canje'}
                   </p>
                 </div>
                 <Button
@@ -338,7 +338,7 @@ export function TradeInSheet({ open, onOpenChange, telefono, onSuccess }: TradeI
               ) : isEditing ? (
                 'Guardar cambios'
               ) : (
-                'Registrar trade-in'
+                'Registrar canje'
               )}
             </Button>
           </div>

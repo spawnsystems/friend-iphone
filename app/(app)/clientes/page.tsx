@@ -1,17 +1,11 @@
-import { getCurrentUserRole } from '@/lib/auth/get-current-user'
-import { isFeatureEnabled } from '@/lib/feature-flags'
-import { ConstructionPlaceholder } from '@/components/construction-placeholder'
+import { notFound } from 'next/navigation'
+import { hasModule } from '@/lib/modules/hasModule'
 import { fetchClientesCompleto } from '@/app/actions/clientes'
 import { ClientesList } from './ClientesList'
 
 export default async function ClientesPage() {
-  const rol = await getCurrentUserRole()
-
-  if (!isFeatureEnabled('clientes', rol)) {
-    return <ConstructionPlaceholder section="Clientes" />
-  }
+  if (!(await hasModule('customers'))) notFound()
 
   const clientes = await fetchClientesCompleto()
-
   return <ClientesList clientes={clientes} />
 }

@@ -2,19 +2,21 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp } from "lucide-react"
+import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AlertCard } from "@/components/alert-card"
 import { RepairCard } from "@/components/repair-card"
 import { NewRepairSheet } from "@/components/new-repair-sheet"
+import { NuevoLoteSheet } from "@/components/nuevo-lote-sheet"
 import { RepairDetailSheet } from "@/components/repair-detail-sheet"
-import type { ReparacionResumen, Alerta, Cliente, AppRole } from "@/lib/types/database"
+import type { ReparacionResumen, Alerta, Cliente, AppRole, PrecioGremio } from "@/lib/types/database"
 
 interface DashboardProps {
-  reparaciones: ReparacionResumen[]
-  alertas: Alerta[]
-  clientes: Cliente[]
-  role: AppRole | null
+  reparaciones:  ReparacionResumen[]
+  alertas:       Alerta[]
+  clientes:      Cliente[]
+  role:          AppRole | null
+  preciosGremio: PrecioGremio[]
 }
 
 export function Dashboard({
@@ -22,9 +24,11 @@ export function Dashboard({
   alertas,
   clientes,
   role,
+  preciosGremio,
 }: DashboardProps) {
   const router = useRouter()
-  const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [sheetOpen,     setSheetOpen]     = React.useState(false)
+  const [loteSheetOpen, setLoteSheetOpen] = React.useState(false)
   const [selectedRepairId, setSelectedRepairId] = React.useState<string | null>(null)
   const [isRefreshing, startRefresh] = React.useTransition()
   const [activeTab, setActiveTab] = React.useState<'todos' | 'recibido' | 'en_reparacion' | 'listo'>('todos')
@@ -264,8 +268,25 @@ export function Dashboard({
         </section>
       </div>
 
-      {/* ── FAB ─ mobile: sobre la bottom nav; desktop: esquina ─ */}
-      <div className="fixed bottom-20 right-5 lg:bottom-6 z-50">
+      {/* ── FABs ─ apilados: Lote arriba, Reparación abajo ── */}
+      <div className="fixed bottom-20 right-5 lg:bottom-6 z-50 flex flex-col items-end gap-3">
+        {/* FAB secundario: Nuevo lote */}
+        <div className="flex items-center gap-2.5">
+          <span className="text-[12px] font-semibold text-muted-foreground bg-background/90 backdrop-blur-sm px-2.5 py-1 rounded-full border border-border/40 shadow-sm">
+            Lote
+          </span>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-11 w-11 rounded-full shadow-md border-border/60 bg-background/90 backdrop-blur-sm hover:bg-secondary active:scale-95 transition-transform"
+            onClick={() => setLoteSheetOpen(true)}
+            aria-label="Nuevo lote"
+          >
+            <Layers className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* FAB principal: Nueva reparación */}
         <Button
           size="lg"
           className="h-14 w-14 rounded-full shadow-xl shadow-primary/25 active:scale-95 transition-transform"
@@ -281,6 +302,15 @@ export function Dashboard({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         clientes={clientes}
+        onSuccess={handleRefresh}
+      />
+
+      {/* ── Nuevo Lote Sheet ───────────────────────────────── */}
+      <NuevoLoteSheet
+        open={loteSheetOpen}
+        onOpenChange={setLoteSheetOpen}
+        clientes={clientes}
+        preciosGremio={preciosGremio}
         onSuccess={handleRefresh}
       />
 

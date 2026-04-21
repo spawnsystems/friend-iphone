@@ -1,7 +1,9 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserRole } from '@/lib/auth/get-current-user'
+import { getCurrentUser, getCurrentUserRole } from '@/lib/auth/get-current-user'
+import { getCurrentTenantId } from '@/lib/tenant/server'
+import { dbAdmin, schema } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import type { EstadoReparacion, Reparacion } from '@/lib/types/database'
@@ -17,11 +19,11 @@ const NuevaReparacionSchema = z.object({
       z.union([
         z.literal(''), // allow empty
         z.string().regex(/^\d{15}$/, 'El IMEI debe tener exactamente 15 dígitos'),
-      ])
+      ]),
     ),
-  modelo: z.string().min(1, 'El modelo es requerido'),
-  tipo_servicio: z.enum(['retail', 'gremio', 'franquicia']),
-  cliente_id: z.string().uuid('Cliente inválido'),
+  modelo:               z.string().min(1, 'El modelo es requerido'),
+  tipo_servicio:        z.enum(['retail', 'gremio', 'franquicia']),
+  cliente_id:           z.string().uuid('Cliente inválido'),
   descripcion_problema: z.string().min(3, 'Describí el problema del equipo'),
 })
 
@@ -37,9 +39,7 @@ type ActionResult =
 // ============================================================
 // Server Action: Crear reparación
 // ============================================================
-export async function crearReparacion(
-  input: NuevaReparacionInput
-): Promise<ActionResult> {
+export async function crearReparacion(input: NuevaReparacionInput): Promise<ActionResult> {
   // 1. Validate input
   const parsed = NuevaReparacionSchema.safeParse(input)
   if (!parsed.success) {
@@ -48,35 +48,24 @@ export async function crearReparacion(
   }
 
   const data = parsed.data
-  const supabase = await createClient()
 
-  // 2. Check auth
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { success: false, error: 'No estás autenticado' }
-  }
+  // 2. Check auth + tenant
+  const [currentUser, tenantId] = await Promise.all([getCurrentUser(), getCurrentTenantId()])
+  if (!currentUser) return { success: false, error: 'No estás autenticado' }
+  if (!tenantId) return { success: false, error: 'Sin sesión de tenant.' }
 
   // 3. If franquicia → validate that the client has a split configured
   if (data.tipo_servicio === 'franquicia') {
-    const { data: cliente, error: clienteError } = await supabase
-      .from('clientes')
-      .select('franquicia_split, nombre')
-      .eq('id', data.cliente_id)
-      .single()
+    const clienteRows = await dbAdmin
+      .select({ franquicia_split: schema.clientes.franquicia_split, nombre: schema.clientes.nombre })
+      .from(schema.clientes)
+      .where(and(eq(schema.clientes.id, data.cliente_id), eq(schema.clientes.tenant_id, tenantId)))
+      .limit(1)
 
-    if (clienteError || !cliente) {
-      return { success: false, error: 'No se encontró el cliente' }
-    }
+    const cliente = clienteRows[0]
+    if (!cliente) return { success: false, error: 'No se encontró el cliente' }
 
-    if (
-      cliente.franquicia_split === null ||
-      cliente.franquicia_split === undefined ||
-      cliente.franquicia_split <= 0
-    ) {
+    if (!cliente.franquicia_split || Number(cliente.franquicia_split) <= 0) {
       return {
         success: false,
         error: `El cliente "${cliente.nombre}" no tiene un split de franquicia configurado. Pedile a Ale que lo configure.`,
@@ -85,42 +74,34 @@ export async function crearReparacion(
   }
 
   // 4. Insert into reparaciones
-  const { data: reparacion, error: insertError } = await supabase
-    .from('reparaciones')
-    .insert({
-      imei: data.imei || null,
-      modelo: data.modelo,
-      descripcion_problema: data.descripcion_problema,
-      cliente_id: data.cliente_id,
-      tipo_servicio: data.tipo_servicio,
-      estado: 'recibido',
-      presupuesto_aprobado: false,
-      created_by: user.id,
-    })
-    .select('id')
-    .single()
+  try {
+    const [reparacion] = await dbAdmin
+      .insert(schema.reparaciones)
+      .values({
+        tenant_id:            tenantId,
+        imei:                 data.imei || null,
+        modelo:               data.modelo,
+        descripcion_problema: data.descripcion_problema,
+        cliente_id:           data.cliente_id,
+        tipo_servicio:        data.tipo_servicio,
+        estado:               'recibido',
+        presupuesto_aprobado: false,
+        created_by:           currentUser.id,
+      })
+      .returning({ id: schema.reparaciones.id })
 
-  if (insertError) {
-    console.error('[crearReparacion] Insert error:', insertError)
+    if (!reparacion) return { success: false, error: 'Error al guardar la reparación. Intentá de nuevo.' }
 
-    // Surface DB trigger errors (e.g. franchise split validation)
-    if (insertError.message?.includes('franquicia')) {
-      return {
-        success: false,
-        error: 'Error de franquicia: verificá que el cliente tenga un split configurado.',
-      }
+    revalidatePath('/')
+    return { success: true, id: reparacion.id }
+  } catch (err) {
+    console.error('[crearReparacion] Insert error:', err)
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.includes('franquicia')) {
+      return { success: false, error: 'Error de franquicia: verificá que el cliente tenga un split configurado.' }
     }
-
-    return {
-      success: false,
-      error: 'Error al guardar la reparación. Intentá de nuevo.',
-    }
+    return { success: false, error: 'Error al guardar la reparación. Intentá de nuevo.' }
   }
-
-  // 5. Revalidate the dashboard
-  revalidatePath('/')
-
-  return { success: true, id: reparacion.id }
 }
 
 // ============================================================
@@ -131,27 +112,27 @@ export async function fetchReparacionById(id: string): Promise<{
   cliente_nombre: string
   cliente_negocio: string | null
 }> {
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { reparacion: null, cliente_nombre: '', cliente_negocio: null }
 
-  const { data, error } = await supabase
-    .from('reparaciones')
-    .select('*, clientes(nombre, nombre_negocio)')
-    .eq('id', id)
-    .single()
+  const rows = await dbAdmin
+    .select({
+      reparacion:      schema.reparaciones,
+      cliente_nombre:  schema.clientes.nombre,
+      cliente_negocio: schema.clientes.nombre_negocio,
+    })
+    .from(schema.reparaciones)
+    .leftJoin(schema.clientes, eq(schema.reparaciones.cliente_id, schema.clientes.id))
+    .where(and(eq(schema.reparaciones.id, id), eq(schema.reparaciones.tenant_id, tenantId)))
+    .limit(1)
 
-  if (error || !data) {
-    console.error('[fetchReparacionById]', error)
-    return { reparacion: null, cliente_nombre: '', cliente_negocio: null }
-  }
+  if (!rows[0]) return { reparacion: null, cliente_nombre: '', cliente_negocio: null }
 
-  const { clientes: clienteData, ...reparacion } = data as Record<string, unknown> & {
-    clientes: { nombre: string; nombre_negocio: string | null } | null
-  }
-
+  const { reparacion, cliente_nombre, cliente_negocio } = rows[0]
   return {
-    reparacion: reparacion as unknown as Reparacion,
-    cliente_nombre: clienteData?.nombre ?? '',
-    cliente_negocio: clienteData?.nombre_negocio ?? null,
+    reparacion:      reparacion as unknown as Reparacion,
+    cliente_nombre:  cliente_nombre ?? '',
+    cliente_negocio: cliente_negocio ?? null,
   }
 }
 
@@ -180,15 +161,14 @@ export async function actualizarReparacion(
     precio_cliente_usd?: number | null
   },
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient()
+  const [currentUser, rol, tenantId] = await Promise.all([
+    getCurrentUser(),
+    getCurrentUserRole(),
+    getCurrentTenantId(),
+  ])
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'No autenticado' }
-
-  const rol = await getCurrentUserRole()
+  if (!currentUser) return { success: false, error: 'No autenticado' }
+  if (!tenantId) return { success: false, error: 'Sin sesión de tenant.' }
 
   // Price fields: dueño/admin only
   if (
@@ -200,19 +180,19 @@ export async function actualizarReparacion(
 
   // Validate state transition
   if (updates.estado) {
-    const { data: current, error: fetchErr } = await supabase
-      .from('reparaciones')
-      .select('estado')
-      .eq('id', id)
-      .single()
+    const currentRows = await dbAdmin
+      .select({ estado: schema.reparaciones.estado })
+      .from(schema.reparaciones)
+      .where(and(eq(schema.reparaciones.id, id), eq(schema.reparaciones.tenant_id, tenantId)))
+      .limit(1)
 
-    if (fetchErr || !current) return { success: false, error: 'Reparación no encontrada.' }
+    if (!currentRows[0]) return { success: false, error: 'Reparación no encontrada.' }
 
-    const validNext = VALID_TRANSITIONS[current.estado as EstadoReparacion] ?? []
+    const validNext = VALID_TRANSITIONS[currentRows[0].estado as EstadoReparacion] ?? []
     if (!validNext.includes(updates.estado)) {
       return {
         success: false,
-        error: `No se puede pasar de "${current.estado}" a "${updates.estado}".`,
+        error: `No se puede pasar de "${currentRows[0].estado}" a "${updates.estado}".`,
       }
     }
   }
@@ -220,8 +200,8 @@ export async function actualizarReparacion(
   // Build update payload
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload: Record<string, any> = {
-    updated_by: user.id,
-    updated_at: new Date().toISOString(),
+    updated_by: currentUser.id,
+    updated_at: new Date(),
   }
 
   if (updates.descripcion_problema !== undefined) payload.descripcion_problema = updates.descripcion_problema
@@ -232,65 +212,60 @@ export async function actualizarReparacion(
 
   if (updates.estado) {
     payload.estado = updates.estado
-    if (updates.estado === 'en_reparacion') payload.fecha_inicio_reparacion = new Date().toISOString()
-    if (updates.estado === 'listo')         payload.fecha_listo             = new Date().toISOString()
-    if (updates.estado === 'entregado')     payload.fecha_entrega           = new Date().toISOString()
+    if (updates.estado === 'en_reparacion') payload.fecha_inicio_reparacion = new Date()
+    if (updates.estado === 'listo')         payload.fecha_listo             = new Date()
+    if (updates.estado === 'entregado')     payload.fecha_entrega           = new Date()
   }
 
   // Descontar stock ANTES de persistir el estado "listo"
   if (updates.estado === 'listo') {
-    const { data: repuestosRep, error: rrFetchErr } = await supabase
-      .from('reparacion_repuestos')
-      .select('id, repuesto_id, cantidad')
-      .eq('reparacion_id', id)
-      .eq('descontado', false)
+    const repuestosRep = await dbAdmin
+      .select({
+        id:         schema.reparacionRepuestos.id,
+        repuesto_id: schema.reparacionRepuestos.repuesto_id,
+        cantidad:   schema.reparacionRepuestos.cantidad,
+      })
+      .from(schema.reparacionRepuestos)
+      .where(
+        and(
+          eq(schema.reparacionRepuestos.reparacion_id, id),
+          eq(schema.reparacionRepuestos.descontado, false),
+        ),
+      )
 
-    if (rrFetchErr) {
-      console.error('[actualizarReparacion] fetch reparacion_repuestos:', rrFetchErr)
-      return { success: false, error: 'Error al obtener los repuestos de la reparación.' }
-    }
+    for (const rr of repuestosRep) {
+      // Leer cantidad actual del repuesto (filtrando por tenant)
+      const repuestoRows = await dbAdmin
+        .select({ cantidad: schema.repuestos.cantidad })
+        .from(schema.repuestos)
+        .where(and(eq(schema.repuestos.id, rr.repuesto_id), eq(schema.repuestos.tenant_id, tenantId)))
+        .limit(1)
 
-    for (const rr of repuestosRep ?? []) {
-      // Leer cantidad actual del repuesto
-      const { data: repuesto, error: readErr } = await supabase
-        .from('repuestos')
-        .select('cantidad')
-        .eq('id', rr.repuesto_id)
-        .single()
-
-      if (readErr || !repuesto) {
-        console.error('[actualizarReparacion] read repuesto:', readErr)
+      if (!repuestoRows[0]) {
         return { success: false, error: `Error al leer stock del repuesto ${rr.repuesto_id}.` }
       }
 
-      const nuevaCantidad = Math.max(0, repuesto.cantidad - rr.cantidad)
+      const nuevaCantidad = Math.max(0, repuestoRows[0].cantidad - rr.cantidad)
 
-      const { error: writeErr } = await supabase
-        .from('repuestos')
-        .update({ cantidad: nuevaCantidad, updated_at: new Date().toISOString() })
-        .eq('id', rr.repuesto_id)
+      await dbAdmin
+        .update(schema.repuestos)
+        .set({ cantidad: nuevaCantidad, updated_at: new Date() })
+        .where(and(eq(schema.repuestos.id, rr.repuesto_id), eq(schema.repuestos.tenant_id, tenantId)))
 
-      if (writeErr) {
-        console.error('[actualizarReparacion] write repuesto:', writeErr)
-        return { success: false, error: `Error al descontar stock del repuesto ${rr.repuesto_id}.` }
-      }
-
-      const { error: markErr } = await supabase
-        .from('reparacion_repuestos')
-        .update({ descontado: true })
-        .eq('id', rr.id)
-
-      if (markErr) {
-        console.error('[actualizarReparacion] mark descontado:', markErr)
-        return { success: false, error: `Error al marcar repuesto ${rr.id} como descontado.` }
-      }
+      await dbAdmin
+        .update(schema.reparacionRepuestos)
+        .set({ descontado: true })
+        .where(eq(schema.reparacionRepuestos.id, rr.id))
     }
   }
 
-  const { error } = await supabase.from('reparaciones').update(payload).eq('id', id)
-
-  if (error) {
-    console.error('[actualizarReparacion]', error)
+  try {
+    await dbAdmin
+      .update(schema.reparaciones)
+      .set(payload)
+      .where(and(eq(schema.reparaciones.id, id), eq(schema.reparaciones.tenant_id, tenantId)))
+  } catch (err) {
+    console.error('[actualizarReparacion]', err)
     return { success: false, error: 'No se pudo actualizar la reparación.' }
   }
 

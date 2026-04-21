@@ -1,8 +1,14 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { AppHeader } from '@/components/app-header'
 import { AppSidebar } from '@/components/app-sidebar'
 import { BottomNav } from '@/components/bottom-nav'
-import { getCurrentUserRole } from '@/lib/auth/get-current-user'
+import { TenantProvider } from '@/lib/tenant/context'
+import { TenantBranding } from '@/components/tenant-branding'
+import { PreviewBanner } from '@/components/preview-banner'
+import { getCurrentUser } from '@/lib/auth/get-current-user'
+import { getCurrentTenant, getMembershipState } from '@/lib/tenant/server'
+import { PREVIEW_COOKIE } from '@/lib/constants'
 
 /**
  * Layout compartido para todas las rutas autenticadas del app.
@@ -11,42 +17,68 @@ import { getCurrentUserRole } from '@/lib/auth/get-current-user'
  *   - Mobile: AppHeader (sticky top) + main + BottomNav (fixed bottom)
  *   - Desktop: AppSidebar (fixed left) + main (sin header global)
  *
- * El rol se fetchea server-side una vez y se pasa a Sidebar + BottomNav
- * para filtrar los slots disponibles (Finanzas es dueño/admin only).
- *
- * Si el usuario no está autenticado, middleware.ts ya redirigió a /login,
- * así que si llegamos acá sin rol significa que el usuario existe en auth
- * pero no tiene fila en la tabla `usuarios` — lo mandamos a login.
+ * Guards:
+ *   - Sin autenticación → /login (ya lo hace middleware, pero por seguridad)
+ *   - Platform admin (sin preview) → /platform siempre
+ *   - Platform admin con preview cookie → entra al tenant como vista previa
+ *   - Sin tenant + miembro inactivo → /acceso-denegado
+ *   - Sin tenant → /onboarding
  */
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const rol = await getCurrentUserRole()
+  const [user, tenant, cookieStore] = await Promise.all([
+    getCurrentUser(),
+    getCurrentTenant(),
+    cookies(),
+  ])
+  const isPreviewMode = !!(user?.is_platform_admin && cookieStore.get(PREVIEW_COOKIE)?.value)
 
-  if (!rol) redirect('/login')
+  // No autenticado
+  if (!user) redirect('/login')
+
+  // Platform admin → siempre va a /platform, salvo que esté en modo preview
+  if (user.is_platform_admin && !isPreviewMode) redirect('/platform')
+
+  // Sin tenant → distinguir casos (usuarios normales)
+  if (!tenant) {
+    const membershipState = await getMembershipState()
+    if (membershipState === 'inactive') redirect('/acceso-denegado')
+    redirect('/onboarding')
+  }
 
   return (
-    <div className="min-h-screen lg:flex bg-background">
-      {/* Desktop sidebar (hidden on mobile) */}
-      <AppSidebar rol={rol} />
+    <TenantProvider tenant={tenant}>
+      <div className="min-h-screen flex flex-col bg-background">
+        {/* Banner de preview — solo visible cuando el platform admin está viendo un tenant */}
+        {isPreviewMode && <PreviewBanner tenantNombre={tenant.nombre} />}
 
-      {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Mobile header (hidden on desktop) */}
-        <AppHeader />
+        <div className="flex-1 lg:flex min-h-0">
+          {/* Inyecta el color del tenant (cliente) */}
+          <TenantBranding />
 
-        {/* Main content.
-            pb-20 mobile: room for BottomNav (h-16) + a little breathing room.
-            lg:pb-0 desktop: no bottom nav, no extra padding needed. */}
-        <main className="flex-1 pb-20 lg:pb-0">
-          {children}
-        </main>
+          {/* Desktop sidebar (hidden on mobile) */}
+          <AppSidebar rol={user.rol} modules={tenant.modules} />
+
+          {/* Main column */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            {/* Mobile header (hidden on desktop) */}
+            <AppHeader tenantNombre={tenant.nombre} tenantLogoUrl={tenant.logo_url} />
+
+            {/* Main content.
+                pb-20 mobile: room for BottomNav (h-16) + a little breathing room.
+                lg:pb-0 desktop: no bottom nav, no extra padding needed. */}
+            <main className="flex-1 pb-20 lg:pb-0">
+              {children}
+            </main>
+          </div>
+
+          {/* Mobile bottom nav (hidden on desktop) */}
+          <BottomNav rol={user.rol} modules={tenant.modules} />
+        </div>
       </div>
-
-      {/* Mobile bottom nav (hidden on desktop) */}
-      <BottomNav rol={rol} />
-    </div>
+    </TenantProvider>
   )
 }
