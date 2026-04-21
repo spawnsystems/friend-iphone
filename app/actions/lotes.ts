@@ -3,9 +3,10 @@
 import { dbAdmin, schema } from '@/lib/db'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getCurrentTenantId } from '@/lib/tenant/server'
-import type { LoteResumen, TipoCliente, EstadoLote } from '@/lib/types/database'
+import type { LoteResumen, ReparacionResumen, TipoCliente, EstadoLote } from '@/lib/types/database'
 
 // ── Tipos ─────────────────────────────────────────────────────
 
@@ -244,9 +245,51 @@ export async function closeLote(loteId: string): Promise<{ success: boolean; err
       .set({ estado: 'cerrado', updated_at: new Date() })
       .where(and(eq(schema.lotes.id, loteId), eq(schema.lotes.tenant_id, tenantId)))
     revalidatePath('/')
+    revalidatePath('/mas/lotes')
     return { success: true }
   } catch (err) {
     console.error('[closeLote]', err)
     return { success: false, error: 'No se pudo cerrar el lote.' }
   }
+}
+
+// ── fetchReparacionesByLote ───────────────────────────────────
+// Todas las reparaciones de un lote (todos los estados).
+// Usa el Supabase client autenticado para que la view SECURITY INVOKER
+// aplique correctamente el filtro de tenant.
+
+export async function fetchReparacionesByLote(loteId: string): Promise<ReparacionResumen[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('v_reparaciones_resumen')
+    .select('*')
+    .eq('lote_id', loteId)
+    .order('fecha_ingreso', { ascending: true })
+
+  if (error) {
+    console.error('[fetchReparacionesByLote]', error)
+    return []
+  }
+
+  return (data ?? []).map((r) => ({
+    id:                   r.id,
+    imei:                 r.imei,
+    modelo:               r.modelo,
+    cliente_nombre:       r.cliente_nombre,
+    cliente_telefono:     r.cliente_telefono,
+    cliente_negocio:      r.cliente_negocio   ?? null,
+    estado:               r.estado,
+    tipo_servicio:        r.tipo_servicio,
+    descripcion_problema: r.descripcion_problema,
+    diagnostico:          r.diagnostico        ?? null,
+    notas_internas:       r.notas_internas     ?? null,
+    fecha_ingreso:        r.fecha_ingreso       ?? r.created_at,
+    costo_reparacion:     null,
+    precio_cliente:       r.precio_cliente_ars,
+    precio_cliente_usd:   r.precio_cliente_usd ?? null,
+    presupuesto_aprobado: r.presupuesto_aprobado ?? false,
+    lote_id:              r.lote_id             ?? null,
+    lote_numero:          r.lote_numero         ?? null,
+  }))
 }
