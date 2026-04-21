@@ -82,7 +82,7 @@ interface LoteDetailSheetProps {
   lote:          LoteResumen | null
   role:          AppRole | null
   onClose:       () => void
-  onLoteClosed:  () => void   // para refrescar la lista
+  onLoteClosed:  (loteId: string) => void   // para refrescar la lista
 }
 
 export function LoteDetailSheet({
@@ -112,16 +112,19 @@ export function LoteDetailSheet({
 
   async function handleClose() {
     if (!lote) return
+    // Optimista: actualizar UI antes de esperar el server
+    setLocalEstado('cerrado')
     setClosing(true)
     const res = await closeLote(lote.id)
     setClosing(false)
     if (!res.success) {
+      // Revertir si falló
+      setLocalEstado('abierto')
       toast.error(res.error ?? 'No se pudo cerrar el lote')
       return
     }
-    setLocalEstado('cerrado')
     toast.success(`Lote L-${lote.numero} cerrado`)
-    onLoteClosed()
+    onLoteClosed(lote.id)
   }
 
   if (!lote) return null

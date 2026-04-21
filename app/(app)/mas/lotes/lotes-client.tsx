@@ -147,14 +147,11 @@ export function LotesClient({ lotes, role }: LotesClientProps) {
     startRefresh(() => router.refresh())
   }
 
-  function handleLoteClosed() {
-    // Actualización optimista: pasar el lote a cerrado localmente
-    if (selectedLote) {
-      setLocalLotes((prev) =>
-        prev.map((l) => l.id === selectedLote.id ? { ...l, estado: 'cerrado' as const } : l)
-      )
-      setSelectedLote((prev) => prev ? { ...prev, estado: 'cerrado' as const } : null)
-    }
+  function handleLoteClosed(loteId: string) {
+    // Lista: marcar cerrado optimistamente (el sheet ya actualizó su propio estado)
+    setLocalLotes((prev) =>
+      prev.map((l) => l.id === loteId ? { ...l, estado: 'cerrado' as const } : l)
+    )
     // Refrescar en background para sincronizar con el servidor
     handleRefresh()
   }
