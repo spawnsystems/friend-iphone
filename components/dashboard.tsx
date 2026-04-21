@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp, Layers } from "lucide-react"
+import { Plus, AlertTriangle, Clock, RefreshCw, CheckCircle2, Wrench, ArrowDown, ArrowUp, Layers, Smartphone, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AlertCard } from "@/components/alert-card"
 import { RepairCard } from "@/components/repair-card"
@@ -29,6 +29,7 @@ export function Dashboard({
   const router = useRouter()
   const [sheetOpen,     setSheetOpen]     = React.useState(false)
   const [loteSheetOpen, setLoteSheetOpen] = React.useState(false)
+  const [pickerOpen,    setPickerOpen]    = React.useState(false)
   const [selectedRepairId, setSelectedRepairId] = React.useState<string | null>(null)
   const [isRefreshing, startRefresh] = React.useTransition()
   const [activeTab, setActiveTab] = React.useState<'todos' | 'recibido' | 'en_reparacion' | 'listo'>('todos')
@@ -268,32 +269,69 @@ export function Dashboard({
         </section>
       </div>
 
-      {/* ── FABs ─ apilados: Lote arriba, Reparación abajo ── */}
+      {/* ── Backdrop para cerrar el picker ─────────────────── */}
+      {pickerOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setPickerOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* ── FAB + Picker ─────────────────────────────────────── */}
       <div className="fixed bottom-20 right-5 lg:bottom-6 z-50 flex flex-col items-end gap-3">
-        {/* FAB secundario: Nuevo lote */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-[12px] font-semibold text-muted-foreground bg-background/90 backdrop-blur-sm px-2.5 py-1 rounded-full border border-border/40 shadow-sm">
-            Lote
-          </span>
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-11 w-11 rounded-full shadow-md border-border/60 bg-background/90 backdrop-blur-sm hover:bg-secondary active:scale-95 transition-transform"
-            onClick={() => setLoteSheetOpen(true)}
-            aria-label="Nuevo lote"
-          >
-            <Layers className="h-5 w-5" />
-          </Button>
+
+        {/* Picker de tipo de ingreso */}
+        <div
+          className={`transition-all duration-200 origin-bottom-right ${
+            pickerOpen
+              ? 'opacity-100 scale-100 pointer-events-auto'
+              : 'opacity-0 scale-95 pointer-events-none'
+          }`}
+        >
+          <div className="bg-card border border-border/40 rounded-2xl shadow-2xl shadow-black/15 overflow-hidden w-60">
+            {/* Opción: Reparación */}
+            <button
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/50 active:bg-muted/70 transition-colors text-left"
+              onClick={() => { setPickerOpen(false); setSheetOpen(true) }}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Smartphone className="h-[18px] w-[18px] text-primary" />
+              </div>
+              <div>
+                <p className="text-[14px] font-semibold text-foreground leading-tight">Reparación</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Un equipo, ingreso individual</p>
+              </div>
+            </button>
+
+            <div className="h-px bg-border/40 mx-4" />
+
+            {/* Opción: Lote */}
+            <button
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/50 active:bg-muted/70 transition-colors text-left"
+              onClick={() => { setPickerOpen(false); setLoteSheetOpen(true) }}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Layers className="h-[18px] w-[18px] text-primary" />
+              </div>
+              <div>
+                <p className="text-[14px] font-semibold text-foreground leading-tight">Lote</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Varios equipos, Gremio o Franquicia</p>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* FAB principal: Nueva reparación */}
+        {/* FAB único — rota a × cuando el picker está abierto */}
         <Button
           size="lg"
-          className="h-14 w-14 rounded-full shadow-xl shadow-primary/25 active:scale-95 transition-transform"
-          onClick={() => setSheetOpen(true)}
+          className="h-14 w-14 rounded-full shadow-xl shadow-primary/25 active:scale-95 transition-all"
+          onClick={() => setPickerOpen((v) => !v)}
+          aria-label="Nuevo ingreso"
         >
-          <Plus className="h-6 w-6" />
-          <span className="sr-only">Nuevo ingreso</span>
+          <span className={`transition-transform duration-200 ${pickerOpen ? 'rotate-45' : 'rotate-0'}`}>
+            {pickerOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
+          </span>
         </Button>
       </div>
 
