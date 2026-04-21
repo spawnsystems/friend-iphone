@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { logout } from '@/app/actions/auth'
+import { PREVIEW_COOKIE } from '@/lib/constants'
 import Link from 'next/link'
 import {
   ChevronRight,
@@ -87,11 +89,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ── Page ─────────────────────────────────────────────────────
 
 export default async function MasPage() {
-  const user = await getCurrentUser()
+  const [user, cookieStore] = await Promise.all([getCurrentUser(), cookies()])
   if (!user) return null
 
-  const isAdmin    = user.rol === 'dueno' || user.rol === 'admin'
-  const isPlatform = user.is_platform_admin
+  const isAdmin      = user.rol === 'dueno' || user.rol === 'admin'
+  // En preview mode el platform admin está actuando como usuario del tenant,
+  // así que ocultamos la sección de plataforma para no romper la ilusión.
+  const isPreview    = !!(user.is_platform_admin && cookieStore.get(PREVIEW_COOKIE)?.value)
+  const isPlatform   = user.is_platform_admin && !isPreview
 
   return (
     <div className="min-h-full bg-background px-5 pt-5 pb-8 max-w-lg lg:max-w-2xl mx-auto">
