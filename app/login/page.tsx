@@ -9,7 +9,6 @@ import { Eye, EyeOff, Loader2, ShieldCheck, ArrowLeft, Mail } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { loginSchema, type LoginFormData } from '@/lib/schemas/auth'
 import { createClient } from '@/lib/supabase/client'
 import { requestPasswordReset } from '@/app/actions/auth'
@@ -60,6 +59,27 @@ function mapSupabaseError(message: string): { title: string; description: string
   }
 }
 
+// ─── Shared background shell ──────────────────────────────────
+
+function AuthShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="relative min-h-screen bg-background flex flex-col items-center justify-center px-6 overflow-hidden">
+      {/* Radial glow sutil en el tope — da profundidad sin distraer */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[40vh]"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--primary) / 0.12), transparent)',
+        }}
+      />
+      <div className="relative w-full max-w-sm">
+        {children}
+      </div>
+    </main>
+  )
+}
+
 // ─── Login Page ───────────────────────────────────────────────
 
 export default function LoginPage() {
@@ -79,7 +99,6 @@ function LoginForm() {
   const [isSendingReset, setIsSendingReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
 
-  // Mostrar errores que vienen por URL (ej: token inválido desde /auth/confirm)
   useEffect(() => {
     const error = searchParams.get('error')
     if (error) {
@@ -98,24 +117,20 @@ function LoginForm() {
 
   async function onSubmit(values: LoginFormData) {
     const supabase = createClient()
-
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
+        email:    values.email,
         password: values.password,
       })
-
       if (error) {
         const { title, description } = mapSupabaseError(error.message)
         toast.error(title, { description })
         return
       }
-
       toast.success('Acceso concedido', {
         description: 'Bienvenido de vuelta.',
         icon: <ShieldCheck className="size-4 text-primary" />,
       })
-
       router.push('/')
       router.refresh()
     } catch {
@@ -130,248 +145,213 @@ function LoginForm() {
       toast.error('Email inválido', { description: 'Ingresá un email válido.' })
       return
     }
-
     setIsSendingReset(true)
-
     try {
       const result = await requestPasswordReset(forgotEmail)
-
       if (!result.success) {
         toast.error('No se pudo enviar el email', { description: result.error })
         return
       }
-
       setResetSent(true)
     } catch {
-      toast.error('Error de conexión', {
-        description: 'No se pudo contactar con el servidor.',
-      })
+      toast.error('Error de conexión', { description: 'No se pudo contactar con el servidor.' })
     } finally {
       setIsSendingReset(false)
     }
   }
 
-  // ── Vista: ¿Olvidaste tu contraseña? ─────────────────────────
+  // ── Vista: Recuperar contraseña ───────────────────────────────
 
   if (view === 'forgot') {
     return (
-      <main className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-sm space-y-8">
+      <AuthShell>
+        <SpawnWordmark />
 
-          <SpawnWordmark />
-
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-4 pt-6">
-              <div className="flex items-center gap-2.5 mb-1">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                  <Mail className="size-4 text-primary" />
-                </div>
-                <CardTitle className="text-base font-semibold">
-                  {resetSent ? 'Email enviado' : 'Recuperar contraseña'}
-                </CardTitle>
-              </div>
-              <CardDescription className="text-[13px]">
+        <div className="mt-10 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/40 shadow-lg shadow-black/5 p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+              <Mail className="size-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-semibold text-foreground leading-tight">
+                {resetSent ? 'Email enviado' : 'Recuperar contraseña'}
+              </h2>
+              <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
                 {resetSent
-                  ? `Revisá la bandeja de ${forgotEmail}. El link expira en 1 hora.`
-                  : 'Te enviamos un link para que puedas elegir una nueva contraseña.'}
-              </CardDescription>
-            </CardHeader>
+                  ? `Revisá ${forgotEmail}`
+                  : 'Te mandamos un link para elegir una nueva contraseña.'}
+              </p>
+            </div>
+          </div>
 
-            <CardContent className="pb-6">
-              {resetSent ? (
-                <div className="flex flex-col gap-4">
-                  <p className="text-[13px] text-muted-foreground">
-                    Si no aparece en unos minutos, revisá la carpeta de spam o pedile al
-                    administrador que lo reenvíe desde el panel.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 rounded-xl text-[13px]"
-                    onClick={() => { setView('login'); setResetSent(false); setForgotEmail('') }}
-                  >
-                    <ArrowLeft className="mr-2 size-4" />
-                    Volver al login
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="forgot-email" className="text-sm font-medium">
-                      Email de tu cuenta
-                    </Label>
-                    <Input
-                      id="forgot-email"
-                      type="email"
-                      placeholder="nombre@ejemplo.com"
-                      autoComplete="email"
-                      autoFocus
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleForgotPassword() }}
-                      className="h-11 rounded-xl bg-secondary/40 border-border focus-visible:border-primary/60 focus-visible:ring-primary/20"
-                    />
-                  </div>
+          {resetSent ? (
+            <div className="space-y-4">
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                Si no aparece en unos minutos, revisá la carpeta de spam o pedile al administrador que lo reenvíe.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-xl text-[13px] border-border/60"
+                onClick={() => { setView('login'); setResetSent(false); setForgotEmail('') }}
+              >
+                <ArrowLeft className="mr-2 size-4" />
+                Volver al login
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="forgot-email" className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  Email
+                </Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="nombre@ejemplo.com"
+                  autoComplete="email"
+                  autoFocus
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleForgotPassword() }}
+                  className="h-11 rounded-xl bg-secondary/50 border-border/60 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/15"
+                />
+              </div>
 
-                  <Button
-                    type="button"
-                    disabled={isSendingReset || !forgotEmail}
-                    className="h-11 w-full rounded-xl font-semibold disabled:opacity-60"
-                    onClick={handleForgotPassword}
-                  >
-                    {isSendingReset ? (
-                      <>
-                        <Loader2 className="mr-2 size-4 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      'Enviar link de recuperación →'
-                    )}
-                  </Button>
+              <Button
+                type="button"
+                disabled={isSendingReset || !forgotEmail}
+                className="h-11 w-full rounded-xl font-semibold"
+                onClick={handleForgotPassword}
+              >
+                {isSendingReset ? (
+                  <><Loader2 className="mr-2 size-4 animate-spin" /> Enviando...</>
+                ) : (
+                  'Enviar link de recuperación'
+                )}
+              </Button>
 
-                  <button
-                    type="button"
-                    className="text-[12px] text-muted-foreground hover:text-foreground transition-colors text-center"
-                    onClick={() => { setView('login'); setForgotEmail('') }}
-                  >
-                    <ArrowLeft className="inline mr-1 size-3" />
-                    Volver al login
-                  </button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <p className="text-center text-[11px] text-muted-foreground/60">
-            Spawn · Plataforma de gestión para talleres
-          </p>
+              <button
+                type="button"
+                className="w-full text-[12px] text-muted-foreground hover:text-foreground transition-colors text-center flex items-center justify-center gap-1.5"
+                onClick={() => { setView('login'); setForgotEmail('') }}
+              >
+                <ArrowLeft className="size-3" />
+                Volver al login
+              </button>
+            </div>
+          )}
         </div>
-      </main>
+
+        <AuthFooter />
+      </AuthShell>
     )
   }
 
   // ── Vista: Login ──────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-8">
+    <AuthShell>
+      <SpawnWordmark />
 
-        <SpawnWordmark />
+      {/* Formulario — sin Card de shadcn, más orgánico */}
+      <div className="mt-10 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/40 shadow-lg shadow-black/5 p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
 
-        {/* Card */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-4 pt-6">
-            <CardTitle className="text-base font-semibold">Accedé a tu cuenta</CardTitle>
-            <CardDescription className="text-[13px]">
-              Solo para personal autorizado.
-            </CardDescription>
-          </CardHeader>
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="nombre@ejemplo.com"
+              autoComplete="email"
+              autoFocus
+              aria-invalid={!!errors.email}
+              className="h-11 rounded-xl bg-secondary/50 border-border/60 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/15"
+              {...register('email')}
+            />
+            {errors.email && (
+              <p className="text-[11px] text-destructive">{errors.email.message}</p>
+            )}
+          </div>
 
-          <CardContent className="pb-6">
-            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5" noValidate>
-
-              {/* Email */}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nombre@ejemplo.com"
-                  autoComplete="email"
-                  autoFocus
-                  aria-invalid={!!errors.email}
-                  className="h-11 rounded-xl bg-secondary/40 border-border focus-visible:border-primary/60 focus-visible:ring-primary/20"
-                  {...register('email')}
-                />
-                {errors.email && (
-                  <p className="text-[11px] text-destructive leading-tight">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Contraseña */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    Contraseña
-                  </Label>
-                  <button
-                    type="button"
-                    className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => {
-                      setForgotEmail(getValues('email') ?? '')
-                      setView('forgot')
-                    }}
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    aria-invalid={!!errors.password}
-                    className="h-11 rounded-xl bg-secondary/40 border-border pr-10 focus-visible:border-primary/60 focus-visible:ring-primary/20"
-                    {...register('password')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                {errors.password && (
-                  <p className="text-[11px] text-destructive leading-tight">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Submit */}
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-1 h-11 w-full rounded-xl font-semibold disabled:opacity-60"
+          {/* Contraseña */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password" className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
+                Contraseña
+              </Label>
+              <button
+                type="button"
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => { setForgotEmail(getValues('email') ?? ''); setView('forgot') }}
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Autenticando...
-                  </>
-                ) : (
-                  'Ingresar →'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                ¿Olvidaste la tuya?
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                aria-invalid={!!errors.password}
+                className="h-11 rounded-xl bg-secondary/50 border-border/60 pr-10 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/15"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="text-[11px] text-destructive">{errors.password.message}</p>
+            )}
+          </div>
 
-        <p className="text-center text-[11px] text-muted-foreground/60">
-          Spawn · Plataforma de gestión para talleres
-        </p>
+          {/* Submit */}
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="mt-1 h-11 w-full rounded-xl font-semibold shadow-sm shadow-primary/20 active:scale-[0.98] transition-transform"
+          >
+            {isSubmitting ? (
+              <><Loader2 className="mr-2 size-4 animate-spin" /> Autenticando...</>
+            ) : (
+              'Ingresar'
+            )}
+          </Button>
+        </form>
       </div>
-    </main>
+
+      <AuthFooter />
+    </AuthShell>
   )
 }
 
-// ── Wordmark de la plataforma ─────────────────────────────────
-// Reemplazar con <img src="/spawn-logo.png" /> cuando esté disponible el asset.
+// ── Wordmark ──────────────────────────────────────────────────
 
 function SpawnWordmark() {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/spawn-logo.png" alt="Spawn" className="h-28 w-auto" />
-      <p className="text-[13px] text-muted-foreground">
-        Gestión para talleres técnicos
-      </p>
     </div>
+  )
+}
+
+// ── Footer ────────────────────────────────────────────────────
+
+function AuthFooter() {
+  return (
+    <p className="mt-8 text-center text-[11px] text-muted-foreground/40 tracking-wide">
+      SPAWN · PLATAFORMA DE GESTIÓN
+    </p>
   )
 }
