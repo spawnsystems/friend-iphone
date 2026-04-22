@@ -4,7 +4,9 @@ import * as React from 'react'
 import { Search, Smartphone, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { TelefonoSheet } from '@/components/telefono-sheet'
+import { TelefonoSheet }  from '@/components/telefono-sheet'
+import { PaginationBar }  from '@/components/pagination-bar'
+import { usePagination }  from '@/lib/hooks/use-pagination'
 import type { AppRole, EstadoTelefono, Telefono } from '@/lib/types/database'
 import { CONDICION_LABELS } from '@/lib/types/database'
 
@@ -88,6 +90,8 @@ export function CelularesTab({
     return matchesEstado && matchesQuery
   })
 
+  const pagination = usePagination(filtered, undefined, [query, estadoFilter, showParaRepuesto])
+
   function handleCardClick(t: Telefono) {
     setSelectedTelefono(t)
     setEditSheetOpen(true)
@@ -167,8 +171,9 @@ export function CelularesTab({
           </p>
         </div>
       ) : (
+        <>
         <div className="space-y-2.5">
-          {filtered.map((telefono) => (
+          {pagination.slice.map((telefono) => (
             <button
               key={telefono.id}
               onClick={() => handleCardClick(telefono)}
@@ -237,6 +242,17 @@ export function CelularesTab({
             </button>
           ))}
         </div>
+        <PaginationBar
+          from={pagination.from}
+          to={pagination.to}
+          total={pagination.total}
+          hasPrev={pagination.hasPrev}
+          hasNext={pagination.hasNext}
+          onPrev={pagination.prev}
+          onNext={pagination.next}
+          label="celulares"
+        />
+        </>
       )}
 
       {/* New telefono sheet */}

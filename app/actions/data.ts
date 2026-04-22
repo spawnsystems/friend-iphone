@@ -27,7 +27,7 @@ export async function fetchReparaciones(): Promise<ReparacionResumen[]> {
     .select('*')
     .in('estado', ['recibido', 'en_reparacion', 'listo'])
     .order('fecha_ingreso', { ascending: false })
-    .limit(50)
+    .limit(300)
 
   if (error) {
     console.error('[fetchReparaciones] Error:', error)

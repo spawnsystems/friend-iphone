@@ -172,7 +172,7 @@ export async function fetchLotes(estado?: 'abierto' | 'cerrado'): Promise<LoteRe
       estado ? eq(schema.lotes.estado, estado) : undefined,
     ))
     .orderBy(desc(schema.lotes.created_at))
-    .limit(100)
+    .limit(500)
 
   // Fetch repair counts separately (aggregate join)
   const loteIds = rows.map(r => r.id)

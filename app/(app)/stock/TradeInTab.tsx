@@ -4,7 +4,9 @@ import * as React from 'react'
 import { ArrowLeftRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { TradeInSheet } from '@/components/trade-in-sheet'
+import { TradeInSheet }  from '@/components/trade-in-sheet'
+import { PaginationBar }  from '@/components/pagination-bar'
+import { usePagination }  from '@/lib/hooks/use-pagination'
 import { moverTradeInAStock } from '@/app/actions/stock'
 import type { Telefono } from '@/lib/types/database'
 import { CONDICION_LABELS } from '@/lib/types/database'
@@ -50,6 +52,8 @@ export function TradeInTab({
 
   const esPendiente = (t: Telefono) => t.estado === 'devuelto'
 
+  const pagination = usePagination(tradeins)
+
   return (
     <>
       {tradeins.length === 0 ? (
@@ -63,8 +67,9 @@ export function TradeInTab({
           </p>
         </div>
       ) : (
+        <>
         <div className="space-y-2.5">
-          {tradeins.map((tradein) => {
+          {pagination.slice.map((tradein) => {
             const pendiente = esPendiente(tradein)
             const isMoving = movingId === tradein.id
 
@@ -143,6 +148,17 @@ export function TradeInTab({
             )
           })}
         </div>
+        <PaginationBar
+          from={pagination.from}
+          to={pagination.to}
+          total={pagination.total}
+          hasPrev={pagination.hasPrev}
+          hasNext={pagination.hasNext}
+          onPrev={pagination.prev}
+          onNext={pagination.next}
+          label="canjes"
+        />
+        </>
       )}
 
       {/* New trade-in sheet */}

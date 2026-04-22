@@ -111,6 +111,56 @@ export async function updateTenant(
   }
 }
 
+// ── updateMyTenantSettings (dueño / admin) ───────────────────
+// Permite al dueño o admin del tenant editar la configuración operativa
+// de su propio taller (nombre, branding, notas, split default).
+// NO requiere is_platform_admin.
+
+export async function updateMyTenantSettings(data: {
+  nombre?:                   string
+  color_primario?:           string | null
+  notas?:                    string | null
+  split_franquicia_default?: number
+}): Promise<ActionResult> {
+  const [user, tenantId] = await Promise.all([getCurrentUser(), getCurrentTenantId()])
+  if (!user || !tenantId) return { success: false, error: 'Sin sesión.' }
+  if (user.rol === 'empleado') return { success: false, error: 'Sin permisos.' }
+
+  // Validaciones
+  if (data.nombre !== undefined && !data.nombre.trim()) {
+    return { success: false, error: 'El nombre del taller no puede estar vacío.' }
+  }
+  if (
+    data.split_franquicia_default !== undefined &&
+    (data.split_franquicia_default < 0 || data.split_franquicia_default > 100)
+  ) {
+    return { success: false, error: 'El split debe estar entre 0 y 100.' }
+  }
+  if (
+    data.color_primario &&
+    !/^#[0-9A-Fa-f]{6}$/.test(data.color_primario)
+  ) {
+    return { success: false, error: 'Color inválido. Usá formato #RRGGBB.' }
+  }
+
+  const updates: Record<string, unknown> = { updated_at: new Date() }
+  if (data.nombre             !== undefined) updates.nombre             = data.nombre.trim()
+  if (data.color_primario     !== undefined) updates.color_primario     = data.color_primario
+  if (data.notas              !== undefined) updates.notas              = data.notas?.trim() || null
+  if (data.split_franquicia_default !== undefined) updates.split_franquicia_default = data.split_franquicia_default
+
+  try {
+    await dbAdmin
+      .update(schema.tenants)
+      .set(updates)
+      .where(eq(schema.tenants.id, tenantId))
+    return { success: true }
+  } catch (err) {
+    console.error('[updateMyTenantSettings]', err)
+    return { success: false, error: 'No se pudo guardar.' }
+  }
+}
+
 // ── toggleModule (platform admin) ────────────────────────────
 
 export async function toggleModule(

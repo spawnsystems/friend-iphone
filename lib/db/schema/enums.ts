@@ -45,6 +45,7 @@ export const tipoMovimientoCajaEnum = pgEnum('tipo_movimiento_caja', [
   'retiro_personal',
   'aporte_personal',
   'ajuste_manual',
+  'transferencia_entre_cajas',
 ])
 
 export const tipoMovimientoCuentaEnum = pgEnum('tipo_movimiento_cuenta', [

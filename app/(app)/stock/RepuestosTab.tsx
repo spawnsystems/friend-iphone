@@ -4,7 +4,9 @@ import * as React from 'react'
 import { Search, Package, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { RepuestoSheet } from '@/components/repuesto-sheet'
+import { RepuestoSheet }  from '@/components/repuesto-sheet'
+import { PaginationBar }  from '@/components/pagination-bar'
+import { usePagination }  from '@/lib/hooks/use-pagination'
 import type { AppRole, CategoriaRepuesto, RepuestoConDisponible } from '@/lib/types/database'
 import { CATEGORIA_REPUESTO_LABELS } from '@/lib/types/database'
 
@@ -69,6 +71,8 @@ export function RepuestosTab({
       r.modelos_compatibles.some((m) => m.toLowerCase().includes(q))
     return matchesCat && matchesQuery
   })
+
+  const pagination = usePagination(filtered, undefined, [query, categoriaFilter])
 
   function handleCardClick(repuesto: RepuestoConDisponible) {
     setSelectedRepuesto(repuesto)
@@ -154,8 +158,9 @@ export function RepuestosTab({
           </p>
         </div>
       ) : (
+        <>
         <div className="space-y-2.5">
-          {filtered.map((repuesto) => {
+          {pagination.slice.map((repuesto) => {
             const isStockBajo = repuesto.cantidad_disponible < repuesto.cantidad_minima
             const isSinStock = repuesto.cantidad_disponible === 0
 
@@ -246,6 +251,17 @@ export function RepuestosTab({
             )
           })}
         </div>
+        <PaginationBar
+          from={pagination.from}
+          to={pagination.to}
+          total={pagination.total}
+          hasPrev={pagination.hasPrev}
+          hasNext={pagination.hasNext}
+          onPrev={pagination.prev}
+          onNext={pagination.next}
+          label="repuestos"
+        />
+        </>
       )}
 
       {/* New repuesto sheet */}

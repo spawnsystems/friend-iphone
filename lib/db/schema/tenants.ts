@@ -1,9 +1,20 @@
 import {
-  pgTable, uuid, text, boolean, timestamp,
+  pgTable, uuid, text, boolean, timestamp, smallint, json,
   primaryKey,
 } from 'drizzle-orm/pg-core'
 import { industryTypeEnum, moduleKeyEnum, appRoleEnum } from './enums'
 import { usuarios } from './users'
+
+// ── Tipos ─────────────────────────────────────────────────────
+
+export interface CotizacionConfig {
+  /** 'fijo' = +/- N pesos fijos · 'porcentaje' = +/- N% */
+  ajuste_tipo?:    'fijo' | 'porcentaje'
+  /** Número con signo: +20 suma, -20 resta */
+  ajuste_valor?:   number
+  /** Fuente que se muestra por defecto */
+  fuente_default?: 'blue' | 'oficial'
+}
 
 // ── tenants ───────────────────────────────────────────────────
 // Cada negocio que usa la plataforma es un tenant.
@@ -12,11 +23,14 @@ export const tenants = pgTable('tenants', {
   nombre:         text('nombre').notNull(),
   industry:       industryTypeEnum('industry').notNull().default('phones'),
   plan_key:       text('plan_key').notNull().default('free'),
-  logo_url:       text('logo_url'),
-  color_primario: text('color_primario'),   // hex, e.g. '#4BBCE8'
-  activo:         boolean('activo').notNull().default(true),
-  created_at:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updated_at:     timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  logo_url:                   text('logo_url'),
+  color_primario:             text('color_primario'),             // hex, e.g. '#4BBCE8'
+  notas:                      text('notas'),                      // notas internas del taller
+  split_franquicia_default:   smallint('split_franquicia_default').notNull().default(30),
+  cotizacion_config:          json('cotizacion_config').$type<CotizacionConfig>().notNull().default({}),
+  activo:                     boolean('activo').notNull().default(true),
+  created_at:                 timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at:                 timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ── tenant_members ────────────────────────────────────────────

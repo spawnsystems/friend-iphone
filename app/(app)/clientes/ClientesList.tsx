@@ -4,8 +4,10 @@ import * as React from 'react'
 import { Plus, Search, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ClientCard } from '@/components/client-card'
+import { ClientCard }    from '@/components/client-card'
 import { NewClientSheet } from '@/components/new-client-sheet'
+import { PaginationBar }  from '@/components/pagination-bar'
+import { usePagination }  from '@/lib/hooks/use-pagination'
 import { cn } from '@/lib/utils'
 import type { Cliente, TipoCliente } from '@/lib/types/database'
 
@@ -37,6 +39,8 @@ export function ClientesList({ clientes: initialClientes }: ClientesListProps) {
       c.telefono?.includes(q)
     return matchesTipo && matchesQuery
   })
+
+  const pagination = usePagination(filtered, undefined, [query, tipoFilter])
 
   function handleNewCliente(newCliente: Cliente) {
     setClientes((prev) => [newCliente, ...prev])
@@ -120,11 +124,23 @@ export function ClientesList({ clientes: initialClientes }: ClientesListProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {filtered.map((cliente) => (
-              <ClientCard key={cliente.id} cliente={cliente} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2.5">
+              {pagination.slice.map((cliente) => (
+                <ClientCard key={cliente.id} cliente={cliente} />
+              ))}
+            </div>
+            <PaginationBar
+              from={pagination.from}
+              to={pagination.to}
+              total={pagination.total}
+              hasPrev={pagination.hasPrev}
+              hasNext={pagination.hasNext}
+              onPrev={pagination.prev}
+              onNext={pagination.next}
+              label="clientes"
+            />
+          </>
         )}
       </div>
 

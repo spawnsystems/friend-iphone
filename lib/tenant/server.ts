@@ -11,19 +11,23 @@ import { dbAdmin, schema } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { PREVIEW_COOKIE } from '@/lib/constants'
+import type { CotizacionConfig } from '@/lib/db/schema/tenants'
 
 // ── Tipos ─────────────────────────────────────────────────────
 
 export interface TenantData {
-  id:             string
-  nombre:         string
-  industry:       'phones' | 'generic'
-  plan_key:       string
-  color_primario: string | null
-  logo_url:       string | null
-  activo:         boolean
+  id:                        string
+  nombre:                    string
+  industry:                  'phones' | 'generic'
+  plan_key:                  string
+  color_primario:            string | null
+  logo_url:                  string | null
+  notas:                     string | null
+  split_franquicia_default:  number
+  cotizacion_config:         CotizacionConfig
+  activo:                    boolean
   /** Lista de module keys habilitados */
-  modules:        string[]
+  modules:                   string[]
 }
 
 // ── getMembershipState ────────────────────────────────────────
@@ -123,13 +127,16 @@ export const getCurrentTenant = cache(async (): Promise<TenantData | null> => {
   if (!tenant) return null
 
   return {
-    id:             tenant.id,
-    nombre:         tenant.nombre,
-    industry:       tenant.industry as 'phones' | 'generic',
-    plan_key:       tenant.plan_key,
-    color_primario: tenant.color_primario ?? null,
-    logo_url:       tenant.logo_url ?? null,
-    activo:         tenant.activo,
-    modules:        moduleRows.map((m) => m.module_key),
+    id:                       tenant.id,
+    nombre:                   tenant.nombre,
+    industry:                 tenant.industry as 'phones' | 'generic',
+    plan_key:                 tenant.plan_key,
+    color_primario:           tenant.color_primario ?? null,
+    logo_url:                 tenant.logo_url ?? null,
+    notas:                    tenant.notas ?? null,
+    split_franquicia_default: tenant.split_franquicia_default ?? 30,
+    cotizacion_config:        (tenant.cotizacion_config as CotizacionConfig) ?? {},
+    activo:                   tenant.activo,
+    modules:                  moduleRows.map((m) => m.module_key),
   }
 })

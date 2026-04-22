@@ -9,14 +9,19 @@ import { RepairCard } from "@/components/repair-card"
 import { NewRepairSheet } from "@/components/new-repair-sheet"
 import { NuevoLoteSheet } from "@/components/nuevo-lote-sheet"
 import { RepairDetailSheet } from "@/components/repair-detail-sheet"
+import { TallerNotice }  from "@/components/taller-notice"
+import { PaginationBar } from "@/components/pagination-bar"
+import { usePagination }  from "@/lib/hooks/use-pagination"
 import type { ReparacionResumen, Alerta, Cliente, AppRole, PrecioGremio } from "@/lib/types/database"
 
 interface DashboardProps {
-  reparaciones:  ReparacionResumen[]
-  alertas:       Alerta[]
-  clientes:      Cliente[]
-  role:          AppRole | null
-  preciosGremio: PrecioGremio[]
+  reparaciones:   ReparacionResumen[]
+  alertas:        Alerta[]
+  clientes:       Cliente[]
+  role:           AppRole | null
+  preciosGremio:  PrecioGremio[]
+  notasTaller?:   string | null
+  tenantId?:      string | null
 }
 
 export function Dashboard({
@@ -25,6 +30,8 @@ export function Dashboard({
   clientes,
   role,
   preciosGremio,
+  notasTaller,
+  tenantId,
 }: DashboardProps) {
   const router = useRouter()
   const [sheetOpen,     setSheetOpen]     = React.useState(false)
@@ -73,6 +80,12 @@ export function Dashboard({
     return activeSort === 'reciente' ? dateB - dateA : dateA - dateB
   })
 
+  const pagination = usePagination(
+    filteredReparaciones,
+    undefined, // PAGE_SIZE = 20
+    [activeTab, activeTipoServicio, activeSort],
+  )
+
   return (
     <div className="min-h-full bg-background">
       <div className="px-5 pt-5 pb-6 max-w-lg lg:max-w-2xl mx-auto">
@@ -90,6 +103,11 @@ export function Dashboard({
             <RefreshCw className={`h-[18px] w-[18px] ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
+
+        {/* ── Aviso del taller ─────────────────────────────── */}
+        {notasTaller && tenantId && (
+          <TallerNotice tenantId={tenantId} notas={notasTaller} />
+        )}
 
         {/* ── Stats Cards ──────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 mb-7">
@@ -149,7 +167,9 @@ export function Dashboard({
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-foreground text-[15px]">Equipos en taller</h2>
             <span className="text-[12px] text-muted-foreground tabular-nums">
-              {reparaciones.length}
+              {filteredReparaciones.length !== reparaciones.length
+                ? `${filteredReparaciones.length} de ${reparaciones.length}`
+                : reparaciones.length}
             </span>
           </div>
 
@@ -256,15 +276,27 @@ export function Dashboard({
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {filteredReparaciones.map((reparacion) => (
-                <RepairCard
-                  key={reparacion.id}
-                  reparacion={reparacion}
-                  onClick={() => setSelectedRepairId(reparacion.id)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="space-y-2.5">
+                {pagination.slice.map((reparacion) => (
+                  <RepairCard
+                    key={reparacion.id}
+                    reparacion={reparacion}
+                    onClick={() => setSelectedRepairId(reparacion.id)}
+                  />
+                ))}
+              </div>
+              <PaginationBar
+                from={pagination.from}
+                to={pagination.to}
+                total={pagination.total}
+                hasPrev={pagination.hasPrev}
+                hasNext={pagination.hasNext}
+                onPrev={pagination.prev}
+                onNext={pagination.next}
+                label="reparaciones"
+              />
+            </>
           )}
         </section>
       </div>

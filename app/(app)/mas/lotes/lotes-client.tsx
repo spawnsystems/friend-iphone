@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { RefreshCw, Layers, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LoteDetailSheet } from '@/components/lote-detail-sheet'
+import { PaginationBar }   from '@/components/pagination-bar'
+import { usePagination }   from '@/lib/hooks/use-pagination'
 import type { AppRole, LoteResumen } from '@/lib/types/database'
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -143,6 +145,8 @@ export function LotesClient({ lotes, role }: LotesClientProps) {
   const cerrados = localLotes.filter((l) => l.estado === 'cerrado')
   const visible  = tab === 'abiertos' ? abiertos : cerrados
 
+  const pagination = usePagination(visible, undefined, [tab])
+
   function handleRefresh() {
     startRefresh(() => router.refresh())
   }
@@ -203,15 +207,27 @@ export function LotesClient({ lotes, role }: LotesClientProps) {
         {visible.length === 0 ? (
           <EmptyState tab={tab} />
         ) : (
-          <div className="space-y-2.5">
-            {visible.map((lote) => (
-              <LoteCard
-                key={lote.id}
-                lote={lote}
-                onClick={() => setSelectedLote(lote)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2.5">
+              {pagination.slice.map((lote) => (
+                <LoteCard
+                  key={lote.id}
+                  lote={lote}
+                  onClick={() => setSelectedLote(lote)}
+                />
+              ))}
+            </div>
+            <PaginationBar
+              from={pagination.from}
+              to={pagination.to}
+              total={pagination.total}
+              hasPrev={pagination.hasPrev}
+              hasNext={pagination.hasNext}
+              onPrev={pagination.prev}
+              onNext={pagination.next}
+              label="lotes"
+            />
+          </>
         )}
       </div>
 
