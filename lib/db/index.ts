@@ -29,6 +29,14 @@ function createDbClient() {
   }
   const client = postgres(process.env.DATABASE_URL, {
     prepare: false, // requerido para PgBouncer (Transaction mode)
+    // En serverless (Vercel) cada lambda es un proceso aislado — limitamos a 1
+    // conexión por instancia para no saturar el connection pool de Supabase.
+    // En dev (long-running node process) también está OK: 1 conexión reutilizada.
+    max: 1,
+    // Cierra conexiones idle después de 20s → ayuda a liberar recursos en lambdas.
+    idle_timeout: 20,
+    // Si una conexión queda colgada más de 10s al conectar, falla rápido.
+    connect_timeout: 10,
   })
   return drizzle(client, { schema, logger: process.env.NODE_ENV === 'development' })
 }

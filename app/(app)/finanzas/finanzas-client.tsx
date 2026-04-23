@@ -12,6 +12,7 @@ import type {
   SaldosCajas, MovimientoCajaRow, CotizacionRow,
   CuentaCorrienteResumen, ReporteMensual,
 } from '@/app/actions/finanzas'
+// ReporteMensual queda en props para compatibilidad con page.tsx (no se pasa a ResumenTab)
 import type { CotizacionConfig } from '@/lib/db/schema/tenants'
 
 type Tab = 'resumen' | 'caja' | 'cotizaciones' | 'cuentas'
@@ -87,7 +88,7 @@ export function FinanzasClient({
         </div>
 
         {/* Content */}
-        {tab === 'resumen'      && <ResumenTab      saldos={saldos} reporte={reporte} cotizacionBlue={cotizacionBlue} onTabChange={setTab} />}
+        {tab === 'resumen'      && <ResumenTab      saldos={saldos} cotizacionBlue={cotizacionBlue} onTabChange={setTab} />}
         {tab === 'caja'         && <CajaTab         saldos={saldos} movimientos={movimientos} onRefresh={handleRefresh} />}
         {tab === 'cotizaciones' && <CotizacionesTab cotizacionBlue={cotizacionBlue} cotizacionOficial={cotizacionOficial} historial={historialCotizaciones} config={cotizacionConfig} onRefresh={handleRefresh} />}
         {tab === 'cuentas'      && <CuentasTab      cuentas={cuentas} cotizacionBlue={cotizacionBlue} onRefresh={handleRefresh} />}

@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   title: 'Spawn',
   description: 'Sistema de gestión para talleres técnicos',
   icons: {
-    icon: '/Icon.png',
-    apple: '/Icon.png',
+    icon: '/icon.png',
+    apple: '/icon.png',
   },
 }
 

@@ -11,6 +11,26 @@ import type { CotizacionConfig } from '@/lib/db/schema/tenants'
 
 export type CajaDestino = 'efectivo_ars' | 'efectivo_usd' | 'banco'
 
+export interface DataPoint {
+  label:        string   // 'DD' para vista mes, 'MM' para vista año
+  ingresos_ars: number
+  egresos_ars:  number
+}
+
+export interface ReportePeriodo {
+  ingresos_ars:     number
+  ingresos_usd:     number
+  egresos_ars:      number
+  egresos_usd:      number
+  reparaciones_completadas: number
+  reparaciones_nuevas:      number
+  ingresos_ars_ant: number   // período anterior (para variación)
+  ingresos_usd_ant: number
+  deuda_total_ars:  number   // siempre actual
+  deuda_total_usd:  number
+  data_points:      DataPoint[]
+}
+
 export type TipoMovimientoCaja =
   | 'ingreso_reparacion'
   | 'ingreso_venta_telefono'
@@ -268,15 +288,8 @@ export async function fetchBluelyticsAPI(): Promise<BluelyticsData | null> {
   }
 }
 
-// ── aplicarAjuste ─────────────────────────────────────────────
-// Aplica la configuración de ajuste del tenant sobre un precio base.
-
-export function aplicarAjuste(precio: number, config: CotizacionConfig): number {
-  if (!config.ajuste_tipo || config.ajuste_valor == null) return precio
-  if (config.ajuste_tipo === 'fijo') return precio + config.ajuste_valor
-  // porcentaje
-  return precio * (1 + config.ajuste_valor / 100)
-}
+// Nota: aplicarAjuste se movió a @/lib/finanzas/ajuste
+// Las exports de archivos 'use server' deben ser todas async.
 
 // ── fetchCotizacionActual ─────────────────────────────────────
 
@@ -490,7 +503,9 @@ export async function cerrarCuenta(data: CerrarCuentaInput): Promise<ActionResul
         NULL
       ) AS cierre_id
     `)
-    const cierreId = (result.rows[0] as any)?.cierre_id as string | undefined
+    // postgres-js driver returns rows as a direct array (not { rows: [...] })
+    const resultRows = Array.isArray(result) ? result : Array.from(result as any)
+    const cierreId = (resultRows[0] as any)?.cierre_id as string | undefined
     revalidatePath('/finanzas')
     return { success: true, cierreId }
   } catch (err: any) {
@@ -499,6 +514,126 @@ export async function cerrarCuenta(data: CerrarCuentaInput): Promise<ActionResul
       ? 'El monto supera el saldo de la cuenta.'
       : 'No se pudo cerrar la cuenta.'
     return { success: false, error: msg }
+  }
+}
+
+// ── fetchReportePeriodo ───────────────────────────────────────
+// Versión flexible del reporte: acepta cualquier período + granularidad de chart.
+
+export async function fetchReportePeriodo(params: {
+  desde:      string   // ISO date string
+  hasta:      string
+  ant_desde:  string   // período anterior
+  ant_hasta:  string
+  chart_gran: 'day' | 'month'
+}): Promise<ReportePeriodo> {
+  const tenantId = await getCurrentTenantId()
+  const empty: ReportePeriodo = {
+    ingresos_ars: 0, ingresos_usd: 0, egresos_ars: 0, egresos_usd: 0,
+    reparaciones_completadas: 0, reparaciones_nuevas: 0,
+    ingresos_ars_ant: 0, ingresos_usd_ant: 0,
+    deuda_total_ars: 0, deuda_total_usd: 0, data_points: [],
+  }
+  if (!tenantId) return empty
+
+  const desde    = new Date(params.desde)
+  const hasta    = new Date(params.hasta)
+  const antDesde = new Date(params.ant_desde)
+  const antHasta = new Date(params.ant_hasta)
+
+  const [movActual, movAnt, reps, deudas, chartRows] = await Promise.all([
+    // Período actual — ingresos y egresos por caja
+    dbAdmin.execute(sql`
+      SELECT caja,
+        COALESCE(SUM(CASE WHEN monto > 0 THEN monto::numeric ELSE 0 END), 0) AS ingresos,
+        COALESCE(SUM(CASE WHEN monto < 0 THEN ABS(monto::numeric) ELSE 0 END), 0) AS egresos
+      FROM movimientos_caja
+      WHERE tenant_id = ${tenantId}::uuid
+        AND created_at >= ${params.desde}::timestamptz
+        AND created_at <= ${params.hasta}::timestamptz
+      GROUP BY caja
+    `),
+
+    // Período anterior — solo ingresos para variación
+    dbAdmin.execute(sql`
+      SELECT caja,
+        COALESCE(SUM(CASE WHEN monto > 0 THEN monto::numeric ELSE 0 END), 0) AS ingresos
+      FROM movimientos_caja
+      WHERE tenant_id = ${tenantId}::uuid
+        AND created_at >= ${params.ant_desde}::timestamptz
+        AND created_at <= ${params.ant_hasta}::timestamptz
+      GROUP BY caja
+    `),
+
+    // Reparaciones del período
+    dbAdmin.select({
+      completadas: sql<number>`COUNT(*) FILTER (WHERE estado IN ('entregado', 'cancelado'))::int`,
+      nuevas:      sql<number>`COUNT(*)::int`,
+    })
+      .from(schema.reparaciones)
+      .where(and(
+        eq(schema.reparaciones.tenant_id, tenantId),
+        gte(schema.reparaciones.created_at, desde),
+        lte(schema.reparaciones.created_at, hasta),
+      )),
+
+    // Deuda total (siempre actual, no por período)
+    dbAdmin.select({
+      total_ars: sql<string>`COALESCE(SUM(saldo_ars), 0)`,
+      total_usd: sql<string>`COALESCE(SUM(saldo_usd), 0)`,
+    })
+      .from(schema.cuentaCorriente)
+      .where(eq(schema.cuentaCorriente.tenant_id, tenantId)),
+
+    // Datos para el gráfico (solo ARS: efectivo_ars + banco)
+    dbAdmin.execute(sql`
+      SELECT
+        TO_CHAR(
+          DATE_TRUNC(${params.chart_gran},
+            created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'
+          ),
+          ${params.chart_gran === 'day' ? 'DD' : 'MM'}
+        ) AS label,
+        COALESCE(SUM(CASE WHEN monto > 0 THEN monto::numeric ELSE 0 END), 0) AS ingresos_ars,
+        COALESCE(SUM(CASE WHEN monto < 0 THEN ABS(monto::numeric) ELSE 0 END), 0) AS egresos_ars
+      FROM movimientos_caja
+      WHERE tenant_id = ${tenantId}::uuid
+        AND caja IN ('efectivo_ars', 'banco')
+        AND created_at >= ${params.desde}::timestamptz
+        AND created_at <= ${params.hasta}::timestamptz
+      GROUP BY 1
+      ORDER BY 1
+    `),
+  ])
+
+  type CajaRow  = { caja: string; ingresos: string; egresos?: string }
+  type ChartRow = { label: string; ingresos_ars: string; egresos_ars: string }
+
+  // postgres-js driver: dbAdmin.execute() returns rows as a direct array, NOT { rows: [...] }
+  const toArr = <T>(r: any): T[] => Array.isArray(r) ? r : Array.from(r ?? [])
+
+  const byKey = (rows: CajaRow[], caja: string, col: 'ingresos' | 'egresos') =>
+    Number((rows.find((r) => r.caja === caja) as any)?.[col] ?? 0)
+
+  const actRows = toArr<CajaRow>(movActual)
+  const antRows = toArr<CajaRow>(movAnt)
+
+  return {
+    ingresos_ars: byKey(actRows, 'efectivo_ars', 'ingresos') + byKey(actRows, 'banco', 'ingresos'),
+    ingresos_usd: byKey(actRows, 'efectivo_usd', 'ingresos'),
+    egresos_ars:  byKey(actRows, 'efectivo_ars', 'egresos')  + byKey(actRows, 'banco', 'egresos'),
+    egresos_usd:  byKey(actRows, 'efectivo_usd', 'egresos'),
+    reparaciones_completadas: reps[0]?.completadas ?? 0,
+    reparaciones_nuevas:      reps[0]?.nuevas ?? 0,
+    ingresos_ars_ant: byKey(antRows, 'efectivo_ars', 'ingresos') + byKey(antRows, 'banco', 'ingresos'),
+    ingresos_usd_ant: byKey(antRows, 'efectivo_usd', 'ingresos'),
+    deuda_total_ars:  Number(deudas[0]?.total_ars ?? 0),
+    deuda_total_usd:  Number(deudas[0]?.total_usd ?? 0),
+    data_points: toArr<ChartRow>(chartRows).map((r) => ({
+      label:        r.label,
+      ingresos_ars: Number(r.ingresos_ars),
+      egresos_ars:  Number(r.egresos_ars),
+    })),
   }
 }
 

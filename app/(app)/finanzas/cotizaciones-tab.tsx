@@ -9,8 +9,8 @@ import {
   fetchBluelyticsAPI,
   createCotizacion,
   updateCotizacionConfig,
-  aplicarAjuste,
 } from '@/app/actions/finanzas'
+import { aplicarAjuste } from '@/lib/finanzas/ajuste'
 import type { CotizacionRow } from '@/app/actions/finanzas'
 import type { CotizacionConfig } from '@/lib/db/schema/tenants'
 
