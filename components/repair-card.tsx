@@ -12,7 +12,7 @@ interface RepairCardProps {
 }
 
 const tipoLabel: Record<string, string> = {
-  retail: "Retail",
+  retail: "Cliente final",
   gremio: "Gremio",
   franquicia: "Franquicia",
 }

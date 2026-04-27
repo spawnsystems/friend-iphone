@@ -6,7 +6,7 @@ import type { Cliente } from '@/lib/types/database'
 const TIPO_CONFIG = {
   retail: {
     icon: User,
-    label: 'Retail',
+    label: 'Cliente final',
     className: 'bg-slate-100 text-slate-600 border-slate-200',
   },
   gremio: {

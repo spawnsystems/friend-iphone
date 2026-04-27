@@ -23,9 +23,9 @@ interface NewClientSheetProps {
 }
 
 const TIPO_OPTIONS: { value: TipoCliente; label: string; description: string; icon: typeof User }[] = [
-  { value: 'retail',     label: 'Retail',     description: 'Cliente individual',           icon: User },
-  { value: 'gremio',     label: 'Gremio',     description: 'Empresa con cuenta corriente', icon: Building2 },
-  { value: 'franquicia', label: 'Franquicia', description: 'Con split de ganancia',        icon: Store },
+  { value: 'retail',     label: 'Cliente final', description: 'Cliente individual',           icon: User },
+  { value: 'gremio',     label: 'Gremio',        description: 'Empresa con cuenta corriente', icon: Building2 },
+  { value: 'franquicia', label: 'Franquicia',    description: 'Con split de ganancia',        icon: Store },
 ]
 
 const INITIAL: {

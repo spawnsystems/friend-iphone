@@ -21,7 +21,7 @@ interface EditClientSheetProps {
 }
 
 const TIPO_ICON = { retail: User, gremio: Building2, franquicia: Store }
-const TIPO_LABEL = { retail: 'Retail', gremio: 'Gremio', franquicia: 'Franquicia' }
+const TIPO_LABEL = { retail: 'Cliente final', gremio: 'Gremio', franquicia: 'Franquicia' }
 
 export function EditClientSheet({ cliente, open, onOpenChange, onSuccess }: EditClientSheetProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false)

@@ -236,7 +236,7 @@ export function Dashboard({
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                   {([
                     { key: 'todos',      label: 'Todos' },
-                    { key: 'retail',     label: 'Retail' },
+                    { key: 'retail',     label: 'Cliente final' },
                     { key: 'gremio',     label: 'Gremio' },
                     { key: 'franquicia', label: 'Franquicia' },
                   ] as const).map(({ key, label }) => (
@@ -271,7 +271,7 @@ export function Dashboard({
             <div className="text-center py-10 px-6">
               <p className="text-[13px] text-muted-foreground">
                 {activeTipoServicio !== 'todos'
-                  ? `No hay equipos ${activeTipoServicio} en este estado.`
+                  ? `No hay equipos ${activeTipoServicio === 'retail' ? 'cliente final' : activeTipoServicio} en este estado.`
                   : 'No hay equipos en este estado.'}
               </p>
             </div>

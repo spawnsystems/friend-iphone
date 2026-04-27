@@ -20,12 +20,12 @@ export default async function FinanzasPage() {
   const tenant = await getCurrentTenant()
   if (!tenant) redirect('/login')
 
-  const [saldos, movimientos, cotizacionBlue, cotizacionOficial, historialCotizaciones, cuentas, reporte] =
+  const [saldos, movimientos, cotizacionBlue, cotizacionQuilmes, historialCotizaciones, cuentas, reporte] =
     await Promise.all([
       fetchSaldosCajas(),
       fetchMovimientosCaja(),
       fetchCotizacionActual('blue'),
-      fetchCotizacionActual('oficial'),
+      fetchCotizacionActual('quilmes'),
       fetchCotizacionesHistorial(),
       fetchCuentasCorrientes(),
       fetchReporteMensual(),
@@ -36,11 +36,10 @@ export default async function FinanzasPage() {
       saldos={saldos}
       movimientos={movimientos}
       cotizacionBlue={cotizacionBlue}
-      cotizacionOficial={cotizacionOficial}
+      cotizacionQuilmes={cotizacionQuilmes}
       historialCotizaciones={historialCotizaciones}
       cuentas={cuentas}
       reporte={reporte}
-      cotizacionConfig={tenant.cotizacion_config}
     />
   )
 }

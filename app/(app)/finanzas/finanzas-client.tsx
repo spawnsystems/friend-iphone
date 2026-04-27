@@ -12,8 +12,6 @@ import type {
   SaldosCajas, MovimientoCajaRow, CotizacionRow,
   CuentaCorrienteResumen, ReporteMensual,
 } from '@/app/actions/finanzas'
-// ReporteMensual queda en props para compatibilidad con page.tsx (no se pasa a ResumenTab)
-import type { CotizacionConfig } from '@/lib/db/schema/tenants'
 
 type Tab = 'resumen' | 'caja' | 'cotizaciones' | 'cuentas'
 
@@ -21,11 +19,10 @@ interface FinanzasClientProps {
   saldos:                  SaldosCajas
   movimientos:             MovimientoCajaRow[]
   cotizacionBlue:          CotizacionRow | null
-  cotizacionOficial:       CotizacionRow | null
+  cotizacionQuilmes:       CotizacionRow | null
   historialCotizaciones:   CotizacionRow[]
   cuentas:                 CuentaCorrienteResumen[]
   reporte:                 ReporteMensual
-  cotizacionConfig:        CotizacionConfig
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -39,11 +36,10 @@ export function FinanzasClient({
   saldos,
   movimientos,
   cotizacionBlue,
-  cotizacionOficial,
+  cotizacionQuilmes,
   historialCotizaciones,
   cuentas,
   reporte,
-  cotizacionConfig,
 }: FinanzasClientProps) {
   const router = useRouter()
   const [tab, setTab] = React.useState<Tab>('resumen')
@@ -90,7 +86,7 @@ export function FinanzasClient({
         {/* Content */}
         {tab === 'resumen'      && <ResumenTab      saldos={saldos} cotizacionBlue={cotizacionBlue} onTabChange={setTab} />}
         {tab === 'caja'         && <CajaTab         saldos={saldos} movimientos={movimientos} onRefresh={handleRefresh} />}
-        {tab === 'cotizaciones' && <CotizacionesTab cotizacionBlue={cotizacionBlue} cotizacionOficial={cotizacionOficial} historial={historialCotizaciones} config={cotizacionConfig} onRefresh={handleRefresh} />}
+        {tab === 'cotizaciones' && <CotizacionesTab cotizacionBlue={cotizacionBlue} cotizacionQuilmes={cotizacionQuilmes} historial={historialCotizaciones} onRefresh={handleRefresh} />}
         {tab === 'cuentas'      && <CuentasTab      cuentas={cuentas} cotizacionBlue={cotizacionBlue} onRefresh={handleRefresh} />}
       </div>
     </div>

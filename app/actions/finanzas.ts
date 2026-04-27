@@ -69,9 +69,9 @@ export interface CotizacionRow {
   created_at:    string
 }
 
-export interface BluelyticsData {
-  blue:    { compra: number; venta: number }
-  oficial: { compra: number; venta: number }
+export interface DolarData {
+  compra: number
+  venta:  number
 }
 
 export interface CuentaCorrienteResumen {
@@ -269,27 +269,53 @@ export async function createTransferenciaEntreCajas(data: {
   }
 }
 
-// ── fetchBluelyticsAPI ────────────────────────────────────────
-// Llama a la API pública de Bluelytics desde el servidor.
+// ── fetchDolarHoy ─────────────────────────────────────────────
+// Obtiene el Dólar Blue desde dolarhoy.com (scraping server-side).
+// Si el HTML cambia, retorna null y el usuario carga manualmente.
 
-export async function fetchBluelyticsAPI(): Promise<BluelyticsData | null> {
+export async function fetchDolarHoy(): Promise<DolarData | null> {
   try {
-    const res = await fetch('https://api.bluelytics.com.ar/v2/latest', {
-      next: { revalidate: 300 },  // cache 5 min
+    const res = await fetch('https://dolarhoy.com/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+      next: { revalidate: 300 },
     })
     if (!res.ok) return null
-    const json = await res.json()
-    return {
-      blue:    { compra: json.blue?.value_buy,    venta: json.blue?.value_sell    },
-      oficial: { compra: json.oficial?.value_buy, venta: json.oficial?.value_sell },
-    }
+    const html = await res.text()
+    // Busca el bloque del dólar blue: "Compra" y "Venta" cerca de la palabra "blue"
+    // Los precios aparecen como números de 3-4 dígitos (ej: 1150, 1165)
+    const blueBlock = html.match(/blue[\s\S]{0,600}/i)?.[0] ?? ''
+    const nums = [...blueBlock.matchAll(/\b(1[0-9]{3}|[5-9][0-9]{2})\b/g)].map(m => Number(m[1]))
+    if (nums.length < 2) return null
+    return { compra: nums[0], venta: nums[1] }
   } catch {
     return null
   }
 }
 
-// Nota: aplicarAjuste se movió a @/lib/finanzas/ajuste
-// Las exports de archivos 'use server' deben ser todas async.
+// ── fetchDolarQuilmes ─────────────────────────────────────────
+// Obtiene el Dólar PBA / Quilmes desde finanzasargy.com.
+
+export async function fetchDolarQuilmes(): Promise<DolarData | null> {
+  try {
+    const res = await fetch('https://finanzasargy.com/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    // Busca el bloque PBA/Quilmes/Provincia
+    const block = (
+      html.match(/quilmes[\s\S]{0,600}/i) ??
+      html.match(/pba[\s\S]{0,600}/i) ??
+      html.match(/provincia[\s\S]{0,600}/i)
+    )?.[0] ?? ''
+    const nums = [...block.matchAll(/\b(1[0-9]{3}|[5-9][0-9]{2})\b/g)].map(m => Number(m[1]))
+    if (nums.length < 2) return null
+    return { compra: nums[0], venta: nums[1] }
+  } catch {
+    return null
+  }
+}
 
 // ── fetchCotizacionActual ─────────────────────────────────────
 
@@ -368,25 +394,7 @@ export async function createCotizacion(data: {
   }
 }
 
-// ── updateCotizacionConfig ────────────────────────────────────
-
-export async function updateCotizacionConfig(config: CotizacionConfig): Promise<ActionResult> {
-  const [user, tenantId] = await Promise.all([getCurrentUser(), getCurrentTenantId()])
-  if (!user || !tenantId) return { success: false, error: 'Sin sesión.' }
-  if (user.rol === 'empleado') return { success: false, error: 'Sin permisos.' }
-
-  try {
-    await dbAdmin
-      .update(schema.tenants)
-      .set({ cotizacion_config: config, updated_at: new Date() })
-      .where(eq(schema.tenants.id, tenantId))
-    revalidatePath('/finanzas')
-    return { success: true }
-  } catch (err) {
-    console.error('[updateCotizacionConfig]', err)
-    return { success: false, error: 'No se pudo guardar la configuración.' }
-  }
-}
+// updateCotizacionConfig eliminado — ajuste de cotización deprecado.
 
 // ── fetchCuentasCorrientes ────────────────────────────────────
 

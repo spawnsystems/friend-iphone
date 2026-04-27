@@ -167,8 +167,9 @@ export function NewRepairSheet({
         return
       }
 
+      const tipoLabel = formData.tipo_servicio === "retail" ? "Cliente final" : formData.tipo_servicio === "gremio" ? "Gremio" : "Franquicia"
       toast.success("Equipo registrado", {
-        description: `${formData.modelo} ingresado como "${formData.tipo_servicio}". Estado: Recibido.`,
+        description: `${formData.modelo} ingresado como "${tipoLabel}". Estado: Recibido.`,
       })
       setFormData(INITIAL_FORM)
       onOpenChange(false)
@@ -185,7 +186,7 @@ export function NewRepairSheet({
     <Dialog open={quickCreateOpen} onOpenChange={(o) => { if (!isCreating) setQuickCreateOpen(o) }}>
       <DialogContent className="max-w-sm" >
         <DialogHeader>
-          <DialogTitle>Crear cliente retail</DialogTitle>
+          <DialogTitle>Crear cliente final</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleQuickCreate} className="space-y-3 pt-1">
           <div className="space-y-1.5">
@@ -352,7 +353,7 @@ export function NewRepairSheet({
                       value={tipo}
                       className="h-11 rounded-xl border border-border/70 bg-secondary/30 text-[13px] font-medium capitalize data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:shadow-sm transition-all"
                     >
-                      {tipo === "retail" ? "Retail" : tipo === "gremio" ? "Gremio" : "Franquicia"}
+                      {tipo === "retail" ? "Cliente final" : tipo === "gremio" ? "Gremio" : "Franquicia"}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -370,7 +371,7 @@ export function NewRepairSheet({
                   placeholder="Buscar cliente..."
                 />
 
-                {/* Quick create — solo para retail */}
+                {/* Quick create — solo para cliente final */}
                 {formData.tipo_servicio === "retail" && (
                   <button
                     type="button"
@@ -386,7 +387,7 @@ export function NewRepairSheet({
                 {formData.tipo_servicio !== "retail" &&
                   allClientes.filter((c) => c.activo && c.tipo === formData.tipo_servicio).length === 0 && (
                   <p className="text-[12px] text-muted-foreground/70 pl-0.5 mt-1">
-                    Sin clientes {formData.tipo_servicio}. Pedile al encargado que los agregue en Clientes.
+                    Sin clientes {formData.tipo_servicio === "gremio" ? "de gremio" : "franquicia"}. Pedile al encargado que los agregue en Clientes.
                   </p>
                 )}
               </div>

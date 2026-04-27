@@ -33,7 +33,7 @@ type ReparacionDetalle = Reparacion & {
 }
 
 const TIPO_LABEL: Record<string, string> = {
-  retail: "Retail",
+  retail: "Cliente final",
   gremio: "Gremio",
   franquicia: "Franquicia",
 }

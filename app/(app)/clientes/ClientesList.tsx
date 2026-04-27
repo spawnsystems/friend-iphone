@@ -13,7 +13,7 @@ import type { Cliente, TipoCliente } from '@/lib/types/database'
 
 const TIPO_FILTERS: { value: 'todos' | TipoCliente; label: string }[] = [
   { value: 'todos',      label: 'Todos' },
-  { value: 'retail',     label: 'Retail' },
+  { value: 'retail',     label: 'Cliente final' },
   { value: 'gremio',     label: 'Gremio' },
   { value: 'franquicia', label: 'Franquicia' },
 ]

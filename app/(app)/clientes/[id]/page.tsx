@@ -8,7 +8,7 @@ import { ClientEditButton } from './ClientEditButton'
 import { cn } from '@/lib/utils'
 
 const TIPO_CONFIG = {
-  retail:     { label: 'Retail',     className: 'bg-slate-100 text-slate-600 border-slate-200', icon: User },
+  retail:     { label: 'Cliente final', className: 'bg-slate-100 text-slate-600 border-slate-200', icon: User },
   gremio:     { label: 'Gremio',     className: 'bg-amber-50 text-amber-700 border-amber-200',  icon: Building2 },
   franquicia: { label: 'Franquicia', className: 'bg-primary/8 text-primary border-primary/20',  icon: Store },
 }

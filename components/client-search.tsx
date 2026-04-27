@@ -34,7 +34,7 @@ const tipoIcons: Record<TipoCliente, typeof User> = {
 }
 
 const tipoLabels: Record<TipoCliente, string> = {
-  retail: "Retail",
+  retail: "Cliente final",
   gremio: "Gremio",
   franquicia: "Franquicia",
 }
@@ -73,6 +73,11 @@ export function ClientSearch({
                   ({selectedClient.nombre_negocio})
                 </span>
               )}
+              {selectedClient.telefono && (
+                <span className="text-muted-foreground/60 text-[12px] truncate">
+                  · {selectedClient.telefono}
+                </span>
+              )}
             </div>
           ) : (
             placeholder
@@ -85,7 +90,7 @@ export function ClientSearch({
         align="start"
       >
         <Command>
-          <CommandInput placeholder="Buscar por nombre..." />
+          <CommandInput placeholder="Buscar por nombre o teléfono..." />
           <CommandList>
             <CommandEmpty>No se encontraron clientes.</CommandEmpty>
             <CommandGroup>
@@ -94,7 +99,7 @@ export function ClientSearch({
                 return (
                   <CommandItem
                     key={cliente.id}
-                    value={`${cliente.nombre} ${cliente.nombre_negocio || ""}`}
+                    value={`${cliente.nombre} ${cliente.nombre_negocio || ""} ${cliente.telefono || ""}`}
                     onSelect={() => {
                       onSelect(
                         cliente.id === value ? null : cliente.id,
@@ -113,9 +118,11 @@ export function ClientSearch({
                     <div className="flex flex-col">
                       <span className="text-[14px]">{cliente.nombre}</span>
                       <span className="text-[11px] text-muted-foreground">
-                        {cliente.nombre_negocio
-                          ? `${cliente.nombre_negocio} — ${tipoLabels[cliente.tipo]}`
-                          : tipoLabels[cliente.tipo]}
+                        {[
+                          cliente.nombre_negocio,
+                          tipoLabels[cliente.tipo],
+                          cliente.telefono,
+                        ].filter(Boolean).join(" — ")}
                       </span>
                     </div>
                   </CommandItem>
